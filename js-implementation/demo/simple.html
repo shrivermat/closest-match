@@ -119,7 +119,7 @@
                     return;
                 }
                 
-                // Import modules
+                // Import modules (using fixed bounding box extractor)
                 const { DocumentProcessor } = await import('../src/document-processor.js');
                 
                 processor = new DocumentProcessor({

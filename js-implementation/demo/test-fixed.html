@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Fixed Bounding Box Extractor</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+        button { 
+            background: #007bff; color: white; border: none; 
+            padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Test Fixed Bounding Box Extractor</h1>
+    <button onclick="runTest()">Run Test</button>
+    <div id="output"></div>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            output.appendChild(div);
+        }
+        
+        window.runTest = async function() {
+            output.innerHTML = ''; // Clear previous results
+            
+            try {
+                log('📂 Loading demo files...', 'info');
+                
+                // Load hOCR file
+                const hocrResponse = await fetch('./document.hocr');
+                const hocrContent = await hocrResponse.text();
+                
+                log('✅ hOCR file loaded', 'success');
+                
+                // Import modules
+                const { BoundingBoxExtractor } = await import('../src/bbox-extractor-fixed.js');
+                const { HOCRParser } = await import('../src/hocr-parser.js');
+                const { TextMatcher } = await import('../src/text-matcher.js');
+                
+                log('✅ Modules imported', 'success');
+                
+                // Parse hOCR
+                const parser = new HOCRParser();
+                const embeddedText = await parser.parseHOCR(hocrContent);
+                
+                log(`✅ hOCR parsed: ${embeddedText.length} characters`, 'success');
+                
+                // Find text match
+                const matcher = new TextMatcher();
+                const searchText = "(54) CIRCUIT AND METHOD FOR OPERATING A CIRCUIT";
+                const matchResult = matcher.findClosestMatch(embeddedText, searchText);
+                
+                log(`🔍 Text match found: ${(matchResult.similarity * 100).toFixed(1)}% similarity`, 'success');
+                log(`📝 Matched text: "${matchResult.text}"`, 'info');
+                
+                // Test the FIXED bounding box extractor
+                log('🧪 Testing FIXED bounding box extractor...', 'info');
+                const extractor = new BoundingBoxExtractor();
+                const bbox = extractor.extractBoundingBox(
+                    hocrContent,  // Original hOCR content
+                    embeddedText, // Embedded text
+                    matchResult.text, 
+                    matchResult.startIndex, 
+                    matchResult.endIndex
+                );
+                
+                if (bbox) {
+                    const width = bbox.x2 - bbox.x1;
+                    const height = bbox.y2 - bbox.y1;
+                    
+                    log(`✅ FIXED Bounding box: [${bbox.x1}, ${bbox.y1}, ${bbox.x2}, ${bbox.y2}]`, 'success');
+                    log(`📐 Dimensions: ${width} x ${height} pixels`, 'info');
+                    
+                    if (width > 0 && height > 0) {
+                        log('🎉 SUCCESS: Bounding box has valid dimensions!', 'success');
+                        
+                        // Show comparison with old method
+                        log('📊 Expected coordinates based on hOCR:', 'info');
+                        log('   - (54): bbox 329 501 388 535', 'info');
+                        log('   - CIRCUIT (line 1): bbox 428 502 588 527', 'info');
+                        log('   - AND: bbox 596 502 676 527', 'info');
+                        log('   - METHOD: bbox 688 502 856 527', 'info');
+                        log('   - FOR: bbox 868 502 946 527', 'info');
+                        log('   - OPERATING: bbox 956 502 1178 527', 'info');
+                        log('   - A: bbox 1185 502 1212 527', 'info');
+                        log('   - CIRCUIT (line 2): bbox 428 544 588 569', 'info');
+                        log('', 'info');
+                        log('   Expected overall bbox: [329, 501, 1212, 569]', 'info');
+                        log(`   Actual bbox:           [${bbox.x1}, ${bbox.y1}, ${bbox.x2}, ${bbox.y2}]`, 'info');
+                        
+                        const accuracy = calculateAccuracy([329, 501, 1212, 569], [bbox.x1, bbox.y1, bbox.x2, bbox.y2]);
+                        log(`   Accuracy: ${(accuracy * 100).toFixed(1)}%`, accuracy > 0.8 ? 'success' : 'error');
+                        
+                    } else {
+                        log('❌ ERROR: Bounding box has zero or negative dimensions!', 'error');
+                    }
+                } else {
+                    log('❌ ERROR: No bounding box returned!', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`, 'error');
+                console.error('Test error:', error);
+            }
+        };
+        
+        function calculateAccuracy(expected, actual) {
+            const expectedArea = (expected[2] - expected[0]) * (expected[3] - expected[1]);
+            const actualArea = (actual[2] - actual[0]) * (actual[3] - actual[1]);
+            
+            // Calculate overlap
+            const overlapX1 = Math.max(expected[0], actual[0]);
+            const overlapY1 = Math.max(expected[1], actual[1]);
+            const overlapX2 = Math.min(expected[2], actual[2]);
+            const overlapY2 = Math.min(expected[3], actual[3]);
+            
+            if (overlapX2 <= overlapX1 || overlapY2 <= overlapY1) {
+                return 0; // No overlap
+            }
+            
+            const overlapArea = (overlapX2 - overlapX1) * (overlapY2 - overlapY1);
+            const unionArea = expectedArea + actualArea - overlapArea;
+            
+            return unionArea > 0 ? overlapArea / unionArea : 0;
+        }
+    </script>
+</body>
+</html>

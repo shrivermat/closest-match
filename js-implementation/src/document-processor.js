@@ -5,7 +5,7 @@
 
 import { TextMatcher } from './text-matcher.js';
 import { HOCRParser } from './hocr-parser.js';
-import { BoundingBoxExtractor } from './bbox-extractor.js';
+import { BoundingBoxExtractor } from './bbox-extractor-fixed.js';
 import { PDFAnnotator } from './pdf-annotator-browser.js';
 
 export class DocumentProcessor {
@@ -32,6 +32,8 @@ export class DocumentProcessor {
      * @returns {Promise<Object>} Result with annotated PDF and metadata
      */
     async processDocument(hocrContent, pdfBytes, searchText, options = {}) {
+        // Store hOCR content for bounding box extraction
+        this._currentHocrContent = hocrContent;
         try {
             // Step 1: Parse hOCR content
             this._log('Parsing hOCR content...');
@@ -57,9 +59,10 @@ export class DocumentProcessor {
             
             this._log(`Found match with ${(matchResult.similarity * 100).toFixed(1)}% similarity: "${matchResult.text}"`);
             
-            // Step 3: Extract bounding box coordinates
+            // Step 3: Extract bounding box coordinates using original hOCR
             this._log('Extracting bounding box...');
             const boundingBox = this.bboxExtractor.extractBoundingBox(
+                hocrContent,  // Use original hOCR content
                 embeddedText, 
                 matchResult.text, 
                 matchResult.startIndex, 
@@ -131,6 +134,7 @@ export class DocumentProcessor {
         let boundingBox = null;
         if (matchResult.similarity > 0) {
             boundingBox = this.bboxExtractor.extractBoundingBox(
+                hocrContent,  // Use original hOCR content
                 embeddedText, 
                 matchResult.text, 
                 matchResult.startIndex, 

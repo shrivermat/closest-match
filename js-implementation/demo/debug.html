@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Bounding Box Extraction</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; background: #f8f9fa; }
+        pre { background: #e9ecef; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+        h3 { color: #495057; }
+    </style>
+</head>
+<body>
+    <h1>🐛 Debug Bounding Box Extraction</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        function log(title, content) {
+            const div = document.createElement('div');
+            div.className = 'result';
+            div.innerHTML = `<h3>${title}</h3><pre>${content}</pre>`;
+            output.appendChild(div);
+        }
+        
+        async function debug() {
+            try {
+                // Load demo hOCR file
+                const hocrResponse = await fetch('./document.hocr');
+                const hocrContent = await hocrResponse.text();
+                
+                // Import modules
+                const { HOCRParser } = await import('../src/hocr-parser.js');
+                const { TextMatcher } = await import('../src/text-matcher.js');
+                const { BoundingBoxExtractor } = await import('../src/bbox-extractor.js');
+                
+                // Parse hOCR
+                const parser = new HOCRParser();
+                const embeddedText = await parser.parseHOCR(hocrContent);
+                
+                log('1. Raw hOCR Sample (first 1000 chars)', hocrContent.substring(0, 1000));
+                log('2. Embedded Text Sample (first 1000 chars)', embeddedText.substring(0, 1000));
+                
+                // Find text match
+                const matcher = new TextMatcher();
+                const searchText = "(54) CIRCUIT AND METHOD FOR OPERATING A CIRCUIT";
+                const matchResult = matcher.findClosestMatch(embeddedText, searchText);
+                
+                log('3. Match Result', JSON.stringify(matchResult, null, 2));
+                
+                // Show the text around the match
+                const beforeMatch = embeddedText.substring(Math.max(0, matchResult.startIndex - 200), matchResult.startIndex);
+                const matchedText = embeddedText.substring(matchResult.startIndex, matchResult.endIndex);
+                const afterMatch = embeddedText.substring(matchResult.endIndex, Math.min(embeddedText.length, matchResult.endIndex + 200));
+                
+                log('4. Context Around Match', 
+                    `BEFORE: "${beforeMatch}"\n` +
+                    `MATCH: "${matchedText}"\n` +
+                    `AFTER: "${afterMatch}"`
+                );
+                
+                // Extract bounding box
+                const extractor = new BoundingBoxExtractor();
+                const bbox = extractor.extractBoundingBox(embeddedText, matchResult.text, matchResult.startIndex, matchResult.endIndex);
+                
+                log('5. Bounding Box Result', JSON.stringify(bbox, null, 2));
+                
+                // Debug the sections used for coordinate extraction
+                const beforeMatchSection = embeddedText.substring(0, matchResult.startIndex);
+                const matchSection = embeddedText.substring(matchResult.startIndex, matchResult.endIndex);
+                
+                // Find LINE markers in each section
+                const lineRegex = /\[\[LINE (\d+) (\d+) (\d+) (\d+)\]\]/g;
+                const beforeMatches = [...beforeMatchSection.matchAll(lineRegex)];
+                const matchMatches = [...matchSection.matchAll(lineRegex)];
+                
+                log('6. LINE Markers Before Match', 
+                    beforeMatches.map(m => `LINE ${m[1]} ${m[2]} ${m[3]} ${m[4]}`).join('\n')
+                );
+                
+                log('7. LINE Markers In Match', 
+                    matchMatches.map(m => `LINE ${m[1]} ${m[2]} ${m[3]} ${m[4]}`).join('\n')
+                );
+                
+                // Test coordinate extraction manually
+                let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+                
+                // Get starting coordinates from last LINE before match
+                if (beforeMatches.length > 0) {
+                    const lastBeforeMatch = beforeMatches[beforeMatches.length - 1];
+                    x1 = parseInt(lastBeforeMatch[1], 10);
+                    y1 = parseInt(lastBeforeMatch[2], 10);
+                    log('8. Starting Coordinates', `x1=${x1}, y1=${y1} from "${lastBeforeMatch[0]}"`);
+                } else {
+                    log('8. Starting Coordinates', 'No LINE markers found before match!');
+                }
+                
+                // Get ending coordinates from matches within
+                x2 = x1; // Initialize with starting x
+                for (const match of matchMatches) {
+                    const currentX2 = parseInt(match[3], 10);
+                    const currentY2 = parseInt(match[4], 10);
+                    
+                    if (currentX2 > x2) {
+                        x2 = currentX2;
+                    }
+                    y2 = currentY2;
+                }
+                
+                log('9. Manual Coordinate Calculation', 
+                    `Final coordinates: [${x1}, ${y1}, ${x2}, ${y2}]\n` +
+                    `Width: ${x2 - x1}, Height: ${y2 - y1}`
+                );
+                
+                // Check if we have the right algorithm
+                if (x1 === x2 && y1 === y2) {
+                    log('🚨 PROBLEM IDENTIFIED', 
+                        'The bounding box has zero width and height!\n' +
+                        'This usually means:\n' +
+                        '1. No LINE markers found within the match\n' +
+                        '2. The match spans multiple lines but coordinates aren\'t being combined correctly\n' +
+                        '3. The coordinate extraction algorithm needs to look at word-level bboxes instead of line-level'
+                    );
+                }
+                
+            } catch (error) {
+                log('❌ Debug Error', error.message + '\n' + error.stack);
+            }
+        }
+        
+        debug();
+    </script>
+</body>
+</html>
