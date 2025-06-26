@@ -1,19 +1,24 @@
 /**
- * PDF Annotator - Pure JavaScript Implementation
- * Uses pdf-lib.js for client-side PDF manipulation
- * Ported from Python annotate_pdf.py concepts
+ * PDF Annotator - Browser Version with CDN pdf-lib
+ * Uses pdf-lib.js loaded from CDN for client-side PDF manipulation
  */
-
-// pdf-lib will be loaded from CDN as global variable
-const { PDFDocument, rgb, degrees } = typeof window !== 'undefined' 
-    ? window.PDFLib 
-    : await import('pdf-lib');
 
 export class PDFAnnotator {
     constructor(options = {}) {
-        this.defaultAnnotationColor = options.color || rgb(1, 0, 0); // Red
+        // Check if pdf-lib is available
+        if (typeof window !== 'undefined' && !window.PDFLib) {
+            throw new Error('pdf-lib not loaded. Please include: <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>');
+        }
+        
+        this.PDFLib = typeof window !== 'undefined' ? window.PDFLib : null;
+        this.defaultAnnotationColor = options.color || this.rgb(1, 0, 0); // Red
         this.defaultAnnotationOpacity = options.opacity || 0.3;
         this.borderWidth = options.borderWidth || 2;
+    }
+    
+    // Helper to access PDFLib functions
+    rgb(r, g, b) {
+        return this.PDFLib ? this.PDFLib.rgb(r, g, b) : { r, g, b };
     }
     
     /**
@@ -29,8 +34,12 @@ export class PDFAnnotator {
             throw new Error('PDF bytes and bounding box are required');
         }
         
+        if (!this.PDFLib) {
+            throw new Error('pdf-lib not available');
+        }
+        
         // Load the PDF document
-        const pdfDoc = await PDFDocument.load(pdfBytes);
+        const pdfDoc = await this.PDFLib.PDFDocument.load(pdfBytes);
         const pages = pdfDoc.getPages();
         
         if (pageNumber >= pages.length) {
@@ -145,7 +154,7 @@ export class PDFAnnotator {
      */
     _addTextLabel(page, coords, label, options = {}) {
         const fontSize = options.labelFontSize || 12;
-        const labelColor = options.labelColor || rgb(0, 0, 0);
+        const labelColor = options.labelColor || this.rgb(0, 0, 0);
         
         // Position label above the rectangle
         const labelX = coords.x;
@@ -165,7 +174,11 @@ export class PDFAnnotator {
      * @returns {Promise<Array>} Array of page info objects
      */
     async getPagesInfo(pdfBytes) {
-        const pdfDoc = await PDFDocument.load(pdfBytes);
+        if (!this.PDFLib) {
+            throw new Error('pdf-lib not available');
+        }
+        
+        const pdfDoc = await this.PDFLib.PDFDocument.load(pdfBytes);
         const pages = pdfDoc.getPages();
         
         return pages.map((page, index) => {
@@ -181,20 +194,6 @@ export class PDFAnnotator {
 
 // Example usage and testing
 if (typeof window === 'undefined') {
-    // Node.js environment - basic test setup
-    console.log('PDF Annotator module loaded');
-    console.log('Note: Full testing requires pdf-lib dependency and PDF file');
-    
-    // Test coordinate transformation
-    const annotator = new PDFAnnotator();
-    
-    const hocrBbox = { x1: 100, y1: 200, x2: 300, y2: 250 };
-    const hocrPageSize = { width: 2560, height: 3300 };
-    const pdfPageSize = { width: 612, height: 792 }; // Standard US Letter
-    
-    const pdfCoords = annotator.transformCoordinates(hocrBbox, hocrPageSize, pdfPageSize);
-    console.log('Coordinate transformation test:');
-    console.log('hOCR bbox:', hocrBbox);
-    console.log('PDF coords:', pdfCoords);
-    console.log('Valid coordinates:', pdfCoords.x >= 0 && pdfCoords.y >= 0);
+    console.log('PDF Annotator (Browser) module loaded');
+    console.log('Note: This version requires pdf-lib to be loaded from CDN');
 }

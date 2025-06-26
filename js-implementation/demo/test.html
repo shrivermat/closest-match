@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Test - JS Implementation</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Quick Test - JavaScript Implementation</h1>
+    <div id="results"></div>
+    
+    <!-- Load pdf-lib from CDN -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+        
+        async function runTests() {
+            try {
+                log('🔧 Testing module imports...', 'info');
+                
+                // Test imports
+                const { TextMatcher } = await import('../src/text-matcher.js');
+                const { HOCRParser } = await import('../src/hocr-parser.js');
+                const { BoundingBoxExtractor } = await import('../src/bbox-extractor.js');
+                
+                log('✅ All modules imported successfully', 'success');
+                
+                // Test basic functionality
+                log('🧪 Testing text matcher...', 'info');
+                const matcher = new TextMatcher();
+                const testResult = matcher.findClosestMatch(
+                    '[[PARAGRAPH]] [[LINE 100 200 300 400]] Hello world this is test text',
+                    'this is test'
+                );
+                
+                log(`✅ Text matcher works: ${testResult.similarity} similarity`, 'success');
+                
+                // Test hOCR parser
+                log('🧪 Testing hOCR parser...', 'info');
+                const parser = new HOCRParser();
+                const sampleHOCR = `
+                    <div class='ocr_page'>
+                        <p class='ocr_par'>
+                            <span class='ocr_line' title='bbox 100 200 500 250'>
+                                <span class='ocrx_word'>Hello</span>
+                                <span class='ocrx_word'>World</span>
+                            </span>
+                        </p>
+                    </div>
+                `;
+                
+                const parsedResult = await parser.parseHOCR(sampleHOCR);
+                log(`✅ hOCR parser works: ${parsedResult.length} characters parsed`, 'success');
+                
+                // Test bounding box extractor
+                log('🧪 Testing bounding box extractor...', 'info');
+                const extractor = new BoundingBoxExtractor();
+                const bbox = extractor.extractBoundingBox(parsedResult, 'Hello World');
+                
+                if (bbox) {
+                    log(`✅ Bounding box extractor works: [${bbox.x1}, ${bbox.y1}, ${bbox.x2}, ${bbox.y2}]`, 'success');
+                } else {
+                    log('⚠️ Bounding box extractor returned null', 'error');
+                }
+                
+                // Test PDF library availability
+                log('🧪 Testing pdf-lib availability...', 'info');
+                if (window.PDFLib) {
+                    log('✅ pdf-lib loaded successfully from CDN', 'success');
+                    
+                    // Test PDF annotator
+                    try {
+                        const { PDFAnnotator } = await import('../src/pdf-annotator-browser.js');
+                        const annotator = new PDFAnnotator();
+                        log('✅ PDF annotator initialized successfully', 'success');
+                    } catch (error) {
+                        log(`❌ PDF annotator failed: ${error.message}`, 'error');
+                    }
+                } else {
+                    log('❌ pdf-lib not available', 'error');
+                }
+                
+                // Test document processor
+                log('🧪 Testing document processor...', 'info');
+                try {
+                    const { DocumentProcessor } = await import('../src/document-processor.js');
+                    const processor = new DocumentProcessor({ debugMode: false });
+                    
+                    const testMatch = await processor.testTextMatching(sampleHOCR, 'Hello World');
+                    log(`✅ Document processor works: ${testMatch.valid ? 'Valid' : 'Invalid'} match`, 
+                        testMatch.valid ? 'success' : 'error');
+                    
+                    // Show debug info
+                    log('<pre>' + JSON.stringify(testMatch, null, 2) + '</pre>', 'info');
+                    
+                } catch (error) {
+                    log(`❌ Document processor failed: ${error.message}`, 'error');
+                }
+                
+                log('🎉 All tests completed!', 'success');
+                
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`, 'error');
+                console.error('Test error:', error);
+            }
+        }
+        
+        // Wait for pdf-lib to load, then run tests
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 200);
+        });
+    </script>
+</body>
+</html>

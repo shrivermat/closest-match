@@ -6,7 +6,7 @@
 import { TextMatcher } from './text-matcher.js';
 import { HOCRParser } from './hocr-parser.js';
 import { BoundingBoxExtractor } from './bbox-extractor.js';
-import { PDFAnnotator } from './pdf-annotator.js';
+import { PDFAnnotator } from './pdf-annotator-browser.js';
 
 export class DocumentProcessor {
     constructor(options = {}) {

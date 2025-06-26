@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Demo - JavaScript Document Annotation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .download-link {
+            display: inline-block;
+            margin: 10px 0;
+            padding: 10px 15px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #output { min-height: 100px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 Simple JavaScript Document Annotation Demo</h1>
+        
+        <div class="section">
+            <h3>📂 Demo Files</h3>
+            <button onclick="loadDemoFiles()">Load Demo Files</button>
+            <div id="fileStatus"></div>
+        </div>
+        
+        <div class="section">
+            <h3>🔍 Search Text</h3>
+            <input type="text" id="searchText" placeholder="Enter text to search for..." 
+                   value="(54) CIRCUIT AND METHOD FOR OPERATING A CIRCUIT">
+            <br><br>
+            <button onclick="testSearch()">🧪 Test Search</button>
+            <button onclick="createAnnotation()">🎯 Create Annotation</button>
+        </div>
+        
+        <div class="section">
+            <h3>📋 Results</h3>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <!-- Load pdf-lib from CDN -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <script type="module">
+        // Global variables
+        let hocrContent = '';
+        let pdfBytes = null;
+        let processor = null;
+        
+        const output = document.getElementById('output');
+        const fileStatus = document.getElementById('fileStatus');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            output.appendChild(div);
+        }
+        
+        function setFileStatus(message, type = 'info') {
+            fileStatus.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+        
+        // Initialize processor
+        window.addEventListener('load', async () => {
+            try {
+                // Wait for pdf-lib
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                if (!window.PDFLib) {
+                    log('❌ pdf-lib failed to load from CDN', 'error');
+                    return;
+                }
+                
+                // Import modules
+                const { DocumentProcessor } = await import('../src/document-processor.js');
+                
+                processor = new DocumentProcessor({
+                    debugMode: true,
+                    minSimilarity: 0.7
+                });
+                
+                log('✅ System initialized successfully', 'success');
+                console.log('Processor ready:', processor);
+                
+            } catch (error) {
+                log(`❌ Initialization failed: ${error.message}`, 'error');
+                console.error('Init error:', error);
+            }
+        });
+        
+        // Load demo files
+        window.loadDemoFiles = async function() {
+            try {
+                setFileStatus('Loading demo files...', 'info');
+                
+                // Load hOCR file
+                const hocrResponse = await fetch('./document.hocr');
+                if (!hocrResponse.ok) throw new Error('Failed to load hOCR file');
+                hocrContent = await hocrResponse.text();
+                
+                // Load PDF file  
+                const pdfResponse = await fetch('./document.pdf');
+                if (!pdfResponse.ok) throw new Error('Failed to load PDF file');
+                pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+                
+                setFileStatus('✅ Demo files loaded successfully', 'success');
+                log('📁 Demo files loaded and ready for processing', 'info');
+                
+            } catch (error) {
+                setFileStatus(`❌ Error loading files: ${error.message}`, 'error');
+                console.error('File loading error:', error);
+            }
+        };
+        
+        // Test search functionality
+        window.testSearch = async function() {
+            if (!validateInputs()) return;
+            
+            try {
+                log('🔍 Testing text search...', 'info');
+                
+                const searchText = document.getElementById('searchText').value;
+                const result = await processor.testTextMatching(hocrContent, searchText);
+                
+                if (result.valid) {
+                    log(`✅ Found match with ${(result.matchResult.similarity * 100).toFixed(1)}% similarity`, 'success');
+                    log(`📍 Text: "${result.matchResult.text}"`, 'info');
+                    log(`📐 Coordinates: [${result.boundingBox.x1}, ${result.boundingBox.y1}, ${result.boundingBox.x2}, ${result.boundingBox.y2}]`, 'info');
+                } else {
+                    log(`❌ No valid match found (${(result.matchResult.similarity * 100).toFixed(1)}% similarity)`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Search failed: ${error.message}`, 'error');
+                console.error('Search error:', error);
+            }
+        };
+        
+        // Create PDF annotation
+        window.createAnnotation = async function() {
+            if (!validateInputs()) return;
+            
+            try {
+                log('🎯 Creating PDF annotation...', 'info');
+                
+                const searchText = document.getElementById('searchText').value;
+                const result = await processor.processDocument(hocrContent, pdfBytes, searchText, {
+                    showLabel: true,
+                    color: window.PDFLib.rgb(1, 0, 0), // Red
+                    opacity: 0.4,
+                    borderWidth: 2
+                });
+                
+                if (result.success) {
+                    // Create download link
+                    const blob = new Blob([result.annotatedPdf], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    log('✅ PDF annotation created successfully!', 'success');
+                    log(`📊 Match: "${result.matchResult.text}" (${(result.matchResult.similarity * 100).toFixed(1)}% similarity)`, 'info');
+                    
+                    const downloadHtml = `
+                        <a href="${url}" download="annotated_document.pdf" class="download-link">
+                            📥 Download Annotated PDF
+                        </a>
+                    `;
+                    
+                    const downloadDiv = document.createElement('div');
+                    downloadDiv.innerHTML = downloadHtml;
+                    output.appendChild(downloadDiv);
+                    
+                } else {
+                    log(`❌ Annotation failed: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Annotation creation failed: ${error.message}`, 'error');
+                console.error('Annotation error:', error);
+            }
+        };
+        
+        function validateInputs() {
+            if (!processor) {
+                log('❌ System not initialized yet', 'error');
+                return false;
+            }
+            
+            if (!hocrContent) {
+                log('❌ Please load demo files first', 'error');
+                return false;
+            }
+            
+            if (!pdfBytes) {
+                log('❌ PDF file not loaded', 'error');
+                return false;
+            }
+            
+            const searchText = document.getElementById('searchText').value.trim();
+            if (!searchText) {
+                log('❌ Please enter search text', 'error');
+                return false;
+            }
+            
+            return true;
+        }
+    </script>
+</body>
+</html>

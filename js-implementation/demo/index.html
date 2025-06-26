@@ -207,7 +207,11 @@
         </div>
     </div>
 
+    <!-- Import pdf-lib from CDN -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
     <script type="module">
+        // Import our modules (pdf-lib is now global)
         import { DocumentProcessor } from '../src/document-processor.js';
         
         // Global variables
@@ -215,17 +219,25 @@
         let pdfBytes = null;
         let processor = null;
         
-        // Initialize processor
+        // Initialize processor after pdf-lib loads
         window.addEventListener('load', () => {
-            processor = new DocumentProcessor({
-                debugMode: true,
-                annotation: {
-                    color: { r: 1, g: 0, b: 0 }, // Red
-                    opacity: 0.3,
-                    borderWidth: 2
+            // Wait a bit for pdf-lib to be available
+            setTimeout(() => {
+                try {
+                    processor = new DocumentProcessor({
+                        debugMode: true,
+                        annotation: {
+                            color: window.PDFLib ? window.PDFLib.rgb(1, 0, 0) : { r: 1, g: 0, b: 0 },
+                            opacity: 0.3,
+                            borderWidth: 2
+                        }
+                    });
+                    console.log('Document processor initialized');
+                    console.log('pdf-lib available:', !!window.PDFLib);
+                } catch (error) {
+                    console.error('Failed to initialize processor:', error);
                 }
-            });
-            console.log('Document processor initialized');
+            }, 100);
         });
         
         // File handling functions
