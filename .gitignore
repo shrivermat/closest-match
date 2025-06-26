@@ -5,6 +5,7 @@
 
 # Dependencies
 /node_modules/
+js-implementation/node_modules/
 
 # IDE files
 .vscode/

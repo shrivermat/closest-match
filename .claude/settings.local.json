@@ -6,7 +6,12 @@
       "Bash(ls:*)",
       "Bash(rg:*)",
       "Bash(find:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(cp:*)",
+      "Bash(npm install)",
+      "Bash(npm test)",
+      "Bash(node:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
