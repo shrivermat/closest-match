@@ -1,0 +1,26 @@
+{
+  "name": "closest-match-js",
+  "version": "0.1.0",
+  "description": "Pure JavaScript implementation of document annotation system",
+  "main": "src/document-processor.js",
+  "type": "module",
+  "scripts": {
+    "dev": "python3 -m http.server 8080",
+    "test": "node tests/run-tests.js"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "jsdom": "^23.0.0"
+  },
+  "keywords": [
+    "pdf",
+    "ocr",
+    "annotation",
+    "hocr",
+    "text-matching"
+  ],
+  "author": "",
+  "license": "MIT"
+}

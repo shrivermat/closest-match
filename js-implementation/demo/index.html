@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Closest Match - JavaScript Implementation Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        
+        .section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        input[type="text"], input[type="file"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        
+        .results.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .results.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .results.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .download-link {
+            display: inline-block;
+            margin: 10px 0;
+            padding: 10px 15px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        
+        .download-link:hover {
+            background: #218838;
+        }
+        
+        .debug-info {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 Closest Match - JavaScript Implementation</h1>
+        <p style="text-align: center; color: #666;">
+            Pure JavaScript document annotation system - no WASM, no complex build pipeline!
+        </p>
+        
+        <!-- File Upload Section -->
+        <div class="section">
+            <h3>📁 File Upload</h3>
+            <div class="input-group">
+                <label for="hocrFile">hOCR File (.hocr):</label>
+                <input type="file" id="hocrFile" accept=".hocr,.html,.htm">
+            </div>
+            <div class="input-group">
+                <label for="pdfFile">PDF File (.pdf):</label>
+                <input type="file" id="pdfFile" accept=".pdf">
+            </div>
+            <button onclick="loadDemoFiles()">📋 Load Demo Files</button>
+        </div>
+        
+        <!-- Search Configuration -->
+        <div class="section">
+            <h3>🔍 Search Configuration</h3>
+            <div class="input-group">
+                <label for="searchText">Search Text:</label>
+                <input type="text" id="searchText" placeholder="Enter text to search for..." 
+                       value="(54) CIRCUIT AND METHOD FOR OPERATING A CIRCUIT">
+            </div>
+            <div class="input-group">
+                <label for="minSimilarity">Minimum Similarity (0.0 - 1.0):</label>
+                <input type="text" id="minSimilarity" value="0.7" style="width: 100px;">
+            </div>
+            <button onclick="testMatching()">🧪 Test Text Matching</button>
+            <button onclick="processDocument()">🎯 Process & Annotate</button>
+        </div>
+        
+        <!-- Loading Indicator -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing document...</p>
+        </div>
+        
+        <!-- Results Section -->
+        <div id="results"></div>
+        
+        <!-- Debug Information -->
+        <div class="section" style="display: none;" id="debugSection">
+            <h3>🐛 Debug Information</h3>
+            <div class="debug-info" id="debugInfo"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { DocumentProcessor } from '../src/document-processor.js';
+        
+        // Global variables
+        let hocrContent = '';
+        let pdfBytes = null;
+        let processor = null;
+        
+        // Initialize processor
+        window.addEventListener('load', () => {
+            processor = new DocumentProcessor({
+                debugMode: true,
+                annotation: {
+                    color: { r: 1, g: 0, b: 0 }, // Red
+                    opacity: 0.3,
+                    borderWidth: 2
+                }
+            });
+            console.log('Document processor initialized');
+        });
+        
+        // File handling functions
+        window.loadDemoFiles = async function() {
+            try {
+                showLoading(true);
+                
+                // Load demo hOCR file
+                const hocrResponse = await fetch('./document.hocr');
+                hocrContent = await hocrResponse.text();
+                
+                // Load demo PDF file
+                const pdfResponse = await fetch('./document.pdf');
+                pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+                
+                showResults('Demo files loaded successfully!', 'success');
+                console.log('Demo files loaded');
+                
+            } catch (error) {
+                showResults(`Error loading demo files: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        };
+        
+        // File input handlers
+        document.getElementById('hocrFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                hocrContent = await file.text();
+                showResults(`hOCR file loaded: ${file.name}`, 'info');
+            }
+        });
+        
+        document.getElementById('pdfFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                pdfBytes = new Uint8Array(await file.arrayBuffer());
+                showResults(`PDF file loaded: ${file.name}`, 'info');
+            }
+        });
+        
+        // Test text matching without PDF annotation
+        window.testMatching = async function() {
+            if (!validateInputs()) return;
+            
+            try {
+                showLoading(true);
+                
+                const searchText = document.getElementById('searchText').value;
+                const result = processor.testTextMatching(hocrContent, searchText);
+                
+                showDebugInfo(result);
+                
+                if (result.valid) {
+                    showResults(`✅ Match found with ${(result.matchResult.similarity * 100).toFixed(1)}% similarity: "${result.matchResult.text}"`, 'success');
+                } else {
+                    showResults(`❌ No valid match found. Similarity: ${(result.matchResult.similarity * 100).toFixed(1)}%`, 'error');
+                }
+                
+            } catch (error) {
+                showResults(`Error during text matching: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        };
+        
+        // Process document and create annotation
+        window.processDocument = async function() {
+            if (!validateInputs()) return;
+            
+            try {
+                showLoading(true);
+                
+                const searchText = document.getElementById('searchText').value;
+                const minSimilarity = parseFloat(document.getElementById('minSimilarity').value);
+                
+                processor.configure({ minSimilarity });
+                
+                const result = await processor.processDocument(hocrContent, pdfBytes, searchText, {
+                    showLabel: true
+                });
+                
+                showDebugInfo(result);
+                
+                if (result.success) {
+                    // Create download link for annotated PDF
+                    const blob = new Blob([result.annotatedPdf], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const downloadHtml = `
+                        <div class="results success">
+                            <h4>✅ Document processed successfully!</h4>
+                            <p><strong>Match:</strong> "${result.matchResult.text}"</p>
+                            <p><strong>Similarity:</strong> ${(result.matchResult.similarity * 100).toFixed(1)}%</p>
+                            <p><strong>Coordinates:</strong> [${result.boundingBox.x1}, ${result.boundingBox.y1}, ${result.boundingBox.x2}, ${result.boundingBox.y2}]</p>
+                            <a href="${url}" download="annotated_document.pdf" class="download-link">
+                                📥 Download Annotated PDF
+                            </a>
+                        </div>
+                    `;
+                    
+                    document.getElementById('results').innerHTML = downloadHtml;
+                    
+                } else {
+                    showResults(`❌ Processing failed: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                showResults(`Error during document processing: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        };
+        
+        // Utility functions
+        function validateInputs() {
+            if (!hocrContent) {
+                showResults('Please load an hOCR file first', 'error');
+                return false;
+            }
+            
+            if (!pdfBytes) {
+                showResults('Please load a PDF file first', 'error');
+                return false;
+            }
+            
+            const searchText = document.getElementById('searchText').value.trim();
+            if (!searchText) {
+                showResults('Please enter search text', 'error');
+                return false;
+            }
+            
+            return true;
+        }
+        
+        function showResults(message, type) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<div class="results ${type}">${message}</div>`;
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+        
+        function showDebugInfo(data) {
+            const debugSection = document.getElementById('debugSection');
+            const debugInfo = document.getElementById('debugInfo');
+            
+            debugInfo.textContent = JSON.stringify(data, null, 2);
+            debugSection.style.display = 'block';
+        }
+        
+        // Make functions available globally
+        window.processor = processor;
+    </script>
+</body>
+</html>
