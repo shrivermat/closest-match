@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM Test</title>
+</head>
+<body>
+    <h1>WASM Loading Test</h1>
+    <div id="output"></div>
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        async function testWASM() {
+            try {
+                output.innerHTML += '<p>Loading WASM module...</p>';
+                
+                // Import the WASM module
+                const wasmModuleImport = await import('http://localhost:9000/pkg_document_annotator_js.index.js');
+                output.innerHTML += '<p>✅ WASM module imported successfully</p>';
+                
+                // Initialize WASM
+                await wasmModuleImport.default();
+                output.innerHTML += '<p>✅ WASM initialized successfully</p>';
+                
+                // Test debug function
+                const testHocr = '<span class="ocrx_word" id="word_1_1" title="bbox 100 200 300 400">TEST</span>';
+                const result = wasmModuleImport.debug_get_raw_hocr(testHocr);
+                output.innerHTML += `<p>✅ Debug function works: ${result.substring(0, 50)}...</p>`;
+                
+                // List all available functions
+                output.innerHTML += '<p>📋 Available WASM functions:</p><ul>';
+                Object.keys(wasmModuleImport).forEach(key => {
+                    if (typeof wasmModuleImport[key] === 'function') {
+                        output.innerHTML += `<li>${key}</li>`;
+                    }
+                });
+                output.innerHTML += '</ul>';
+                
+            } catch (error) {
+                output.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+                console.error('WASM test error:', error);
+            }
+        }
+        
+        testWASM();
+    </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+voltage regulator that can be connected or is connected to the circuit section in order to operate the circuit section, a second voltage regulator that can be connected or is connected to the circuit section in order to preserve an information item stored in the memory
+
+section. The circuit being configured to control a deactivation and activation of the first Voltage regulator and the deactivation and activation of the inputs of the circuit section.
+
+(75) Inventors: Wolfram Kluge, Dresden (DE): Jeannette Zarbock, Dresden (DE); Tilo Ferchland, Dresden (DE)
+
+6,798,709 B2 * 9/2004 Sim et al. ...................... 365,226 6,901,014 B2 5/2005 Son et al. 7,307,907 B2 12/2007 Houston 7,345,931 B2 3/2008 Partsch et al.
+
+(54) CIRCUIT AND METHOD FOR OPERATING A CIRCUIT
+
+(57) ABSTRACT A circuit and method for operating a circuit is provided that includes a circuit section that has a number of memory ele ments, a first Voltage regulator that can be connected or is connected to the circuit section in order to operate the circuit section, a second Voltage regulator that can be connected or is connected to the circuit section in order to preserve an infor mation item stored in the memory elements, a Switching device that is connected to the circuit section and is designed to deactivate and activate inputs of the circuit section. The circuit being configured to control a deactivation and activa tion of the first Voltage regulator and the deactivation and activation of the inputs of the circuit section.
+
+
+
+Problem ones:
+
+B2 5/2005 Son et al. 7,307,907 B2 12/2007 Houston 7,345,931 B2 3/2008 Partsch et
+
+(10) Patent No.: (45) Date of Patent:

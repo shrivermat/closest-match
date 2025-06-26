@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Annotator Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .match-result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .similarity-score {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .loading {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Document Annotator Demo</h1>
+    <p>This demo showcases the WASM-based document annotation system.</p>
+    
+    <div class="panel">
+        <h2>Quick Test</h2>
+        <button id="testWasm">Test WASM Module</button>
+        <div id="testResult"></div>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2>Input</h2>
+            <form id="annotationForm">
+                <div class="form-group">
+                    <label for="searchQuery">Search Query:</label>
+                    <textarea id="searchQuery" rows="3" placeholder="Enter text to search for... (supports HTML formatting)">&lt;strong style="color: red;"&gt;voltage regulator&lt;/strong&gt;</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="richTextFormat">Rich Text Format:</label>
+                    <select id="richTextFormat">
+                        <option value="auto">Auto-detect</option>
+                        <option value="plain">Plain Text</option>
+                        <option value="html">HTML</option>
+                        <option value="rtf">RTF</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="hocrUrl">hOCR File URL:</label>
+                    <input type="url" id="hocrUrl" placeholder="URL to hOCR file..." value="./hocr page 1.txt">
+                </div>
+                
+                <div class="form-group">
+                    <label for="pdfUrl">PDF File URL:</label>
+                    <input type="url" id="pdfUrl" placeholder="URL to PDF file..." value="./8193792 1.pdf">
+                </div>
+                
+                <div class="form-group">
+                    <label for="docUID">Document UID:</label>
+                    <input type="text" id="docUID" placeholder="Unique document identifier..." value="US8193792B2">
+                </div>
+                
+                <div class="form-group">
+                    <label for="pageNumber">Page Number:</label>
+                    <input type="number" id="pageNumber" min="1" value="1">
+                </div>
+                
+                <div class="form-group">
+                    <label for="tolerance">Similarity Tolerance (0.0 - 1.0):</label>
+                    <input type="number" id="tolerance" min="0" max="1" step="0.1" value="0.8">
+                </div>
+                
+                <div class="form-group">
+                    <label for="annotationType">Annotation Type:</label>
+                    <select id="annotationType">
+                        <option value="rectangle">Rectangle</option>
+                        <option value="highlight">Highlight</option>
+                        <option value="underline">Underline</option>
+                        <option value="strikethrough">Strikethrough</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="annotationColor">Annotation Color:</label>
+                    <input type="color" id="annotationColor" value="#ff0000">
+                </div>
+                
+                <div class="form-group">
+                    <label for="backgroundColor">Background Color (for highlights):</label>
+                    <input type="color" id="backgroundColor" value="#ffff00">
+                </div>
+                
+                <button type="submit">Process Document</button>
+                <button type="button" id="clearResults">Clear Results</button>
+                
+                <div style="margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+                    <h4>Example Rich Text Queries:</h4>
+                    <p><strong>HTML Examples:</strong></p>
+                    <ul style="font-size: 12px; margin: 5px 0;">
+                        <li><code>&lt;strong style="color: red;"&gt;voltage regulator&lt;/strong&gt;</code></li>
+                        <li><code>&lt;span style="background-color: yellow;"&gt;circuit section&lt;/span&gt;</code></li>
+                        <li><code>&lt;u&gt;memory elements&lt;/u&gt;</code></li>
+                        <li><code>&lt;s&gt;deprecated feature&lt;/s&gt;</code></li>
+                    </ul>
+                    <p><strong>RTF Examples:</strong></p>
+                    <ul style="font-size: 12px; margin: 5px 0;">
+                        <li><code>{\rtf1\ansi\deff0 \b voltage regulator}</code></li>
+                        <li><code>{\rtf1\ansi\deff0 \i \ul circuit section}</code></li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <div class="panel">
+            <h2>Results</h2>
+            <div id="status"></div>
+            <div id="results" class="results"></div>
+            <div id="downloadArea"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // This would normally import the built module
+        // import { DocumentAnnotator } from '../dist/index.js';
+        
+        // For demo purposes, we'll create a mock implementation
+        class MockDocumentAnnotator {
+            async testWasm() {
+                // Simulate WASM test
+                await new Promise(resolve => setTimeout(resolve, 500));
+                return true;
+            }
+            
+            async annotatePage(searchQuery, pageObj, options = {}) {
+                // Simulate processing
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Mock result with annotation type and formatting
+                const annotationType = options.annotationType || 'rectangle';
+                const formatting = options.formatting || {};
+                
+                // Parse rich text if applicable
+                let displayText = searchQuery;
+                let parsedFormatting = formatting;
+                
+                if (options.richTextFormat && options.richTextFormat !== 'plain') {
+                    // Mock parsing of rich text
+                    if (searchQuery.includes('<strong>')) {
+                        displayText = searchQuery.replace(/<\/?strong[^>]*>/g, '');
+                        parsedFormatting = { ...formatting, bold: true };
+                    }
+                    if (searchQuery.includes('color:')) {
+                        const colorMatch = searchQuery.match(/color:\s*([^;"]+)/);
+                        if (colorMatch) {
+                            parsedFormatting.color = colorMatch[1].trim();
+                        }
+                    }
+                    if (searchQuery.includes('<u>')) {
+                        displayText = searchQuery.replace(/<\/?u[^>]*>/g, '');
+                        annotationType = 'underline';
+                    }
+                    if (searchQuery.includes('<s>')) {
+                        displayText = searchQuery.replace(/<\/?s[^>]*>/g, '');
+                        annotationType = 'strikethrough';
+                    }
+                    if (searchQuery.includes('background-color:')) {
+                        const bgMatch = searchQuery.match(/background-color:\s*([^;"]+)/);
+                        if (bgMatch) {
+                            parsedFormatting.backgroundColor = bgMatch[1].trim();
+                            annotationType = 'highlight';
+                        }
+                    }
+                }
+                
+                return {
+                    docUID: pageObj.docUID,
+                    pageNumber: pageObj.pageNumber,
+                    pdfData: new Blob(['mock pdf data'], { type: 'application/pdf' }),
+                    matches: [
+                        {
+                            text: displayText,
+                            similarity: 0.95,
+                            boundingBox: [100, 200, 300, 400],
+                            pageNumber: pageObj.pageNumber,
+                            docUID: pageObj.docUID,
+                            searchQuery: displayText,
+                            startIndex: 0,
+                            endIndex: 2,
+                            annotationType: annotationType,
+                            formatting: parsedFormatting
+                        }
+                    ],
+                    processingTime: 987.5
+                };
+            }
+        }
+        
+        const annotator = new MockDocumentAnnotator();
+        
+        // Test WASM functionality
+        document.getElementById('testWasm').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.innerHTML = '<div class="loading">Testing WASM module...</div>';
+            
+            try {
+                const success = await annotator.testWasm();
+                if (success) {
+                    resultDiv.innerHTML = '<div class="success">✅ WASM module is working correctly!</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="error">❌ WASM module test failed</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        });
+        
+        // Handle form submission
+        document.getElementById('annotationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            const downloadDiv = document.getElementById('downloadArea');
+            
+            // Get form values
+            const searchQuery = document.getElementById('searchQuery').value;
+            const richTextFormat = document.getElementById('richTextFormat').value;
+            const hocrUrl = document.getElementById('hocrUrl').value;
+            const pdfUrl = document.getElementById('pdfUrl').value;
+            const docUID = document.getElementById('docUID').value;
+            const pageNumber = parseInt(document.getElementById('pageNumber').value);
+            const tolerance = parseFloat(document.getElementById('tolerance').value);
+            const annotationType = document.getElementById('annotationType').value;
+            const annotationColor = document.getElementById('annotationColor').value;
+            const backgroundColor = document.getElementById('backgroundColor').value;
+            
+            // Validate inputs
+            if (!searchQuery || !hocrUrl || !pdfUrl || !docUID) {
+                statusDiv.innerHTML = '<div class="error">Please fill in all required fields</div>';
+                return;
+            }
+            
+            statusDiv.innerHTML = '<div class="loading">Processing document... This may take a few seconds.</div>';
+            resultsDiv.innerHTML = '';
+            downloadDiv.innerHTML = '';
+            
+            try {
+                const pageObj = {
+                    hocrUrl,
+                    pdfUrl,
+                    docUID,
+                    pageNumber
+                };
+                
+                const options = {
+                    tolerance,
+                    outputFormat: 'blob',
+                    annotationType,
+                    richTextFormat,
+                    formatting: {
+                        color: annotationColor,
+                        backgroundColor: backgroundColor
+                    }
+                };
+                
+                const result = await annotator.annotatePage(searchQuery, pageObj, options);
+                
+                statusDiv.innerHTML = '<div class="success">✅ Processing completed successfully!</div>';
+                
+                // Display results
+                const resultHtml = `
+                    <h3>Processing Results</h3>
+                    <p><strong>Document:</strong> ${result.docUID}, Page ${result.pageNumber}</p>
+                    <p><strong>Processing Time:</strong> ${result.processingTime.toFixed(2)}ms</p>
+                    <p><strong>Matches Found:</strong> ${result.matches.length}</p>
+                    
+                    ${result.matches.map((match, index) => `
+                        <div class="match-result">
+                            <h4>Match ${index + 1}</h4>
+                            <p><strong>Text:</strong> "${match.text}"</p>
+                            <p><strong>Similarity:</strong> <span class="similarity-score">${(match.similarity * 100).toFixed(1)}%</span></p>
+                            <p><strong>Annotation Type:</strong> ${match.annotationType || 'rectangle'}</p>
+                            <p><strong>Color:</strong> <span style="background-color: ${match.formatting?.color || '#ff0000'}; padding: 2px 6px; border-radius: 3px; color: white;">${match.formatting?.color || '#ff0000'}</span></p>
+                            ${match.formatting?.backgroundColor ? `<p><strong>Background:</strong> <span style="background-color: ${match.formatting.backgroundColor}; padding: 2px 6px; border-radius: 3px;">${match.formatting.backgroundColor}</span></p>` : ''}
+                            <p><strong>Bounding Box:</strong> [${match.boundingBox.join(', ')}]</p>
+                            <p><strong>Position:</strong> Characters ${match.startIndex} - ${match.endIndex}</p>
+                        </div>
+                    `).join('')}
+                `;
+                
+                resultsDiv.innerHTML = resultHtml;
+                
+                // Create download link for annotated PDF
+                const url = URL.createObjectURL(result.pdfData);
+                downloadDiv.innerHTML = `
+                    <h3>Download</h3>
+                    <a href="${url}" download="${result.docUID}_page${result.pageNumber}_annotated.pdf">
+                        <button>📄 Download Annotated PDF</button>
+                    </a>
+                `;
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                console.error('Processing error:', error);
+            }
+        });
+        
+        // Clear results
+        document.getElementById('clearResults').addEventListener('click', () => {
+            document.getElementById('status').innerHTML = '';
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('downloadArea').innerHTML = '';
+        });
+    </script>
+</body>
+</html>
