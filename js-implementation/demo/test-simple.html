@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Simple Python Port</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { 
+            background: #007bff; color: white; border: none; 
+            padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🐍 Test Simple Python Port</h1>
+    <button onclick="runTest()">Run Test</button>
+    <div id="output"></div>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            output.appendChild(div);
+        }
+        
+        window.runTest = async function() {
+            output.innerHTML = '';
+            
+            try {
+                log('📂 Loading demo files...', 'info');
+                
+                // Load hOCR and parse to embedded text
+                const hocrResponse = await fetch('./document.hocr');
+                const hocrContent = await hocrResponse.text();
+                
+                const { HOCRParser } = await import('../src/hocr-parser.js');
+                const parser = new HOCRParser();
+                const embeddedText = await parser.parseHOCR(hocrContent);
+                
+                log(`✅ Embedded text created: ${embeddedText.length} characters`, 'success');
+                
+                // Show a sample of the embedded text
+                log(`📄 Sample embedded text: "${embeddedText.substring(0, 200)}..."`, 'info');
+                
+                // Test text matching
+                const { TextMatcher } = await import('../src/text-matcher.js');
+                const matcher = new TextMatcher();
+                const searchText = "(54) CIRCUIT AND METHOD FOR OPERATING A CIRCUIT";
+                const matchResult = matcher.findClosestMatch(embeddedText, searchText);
+                
+                log(`🔍 Text match: ${(matchResult.similarity * 100).toFixed(1)}% similarity`, 'success');
+                log(`📝 Matched: "${matchResult.text}"`, 'info');
+                
+                // Test the SIMPLE Python-port bounding box extractor
+                log('🐍 Testing Python-port bounding box extractor...', 'info');
+                const { BoundingBoxExtractor } = await import('../src/bbox-extractor-simple.js');
+                const extractor = new BoundingBoxExtractor();
+                
+                console.log('About to call extractBoundingBox with:');
+                console.log('embeddedText length:', embeddedText.length);
+                console.log('matchResult.text:', matchResult.text);
+                
+                const bbox = extractor.extractBoundingBox(embeddedText, matchResult.text);
+                
+                if (bbox) {
+                    const width = bbox.x2 - bbox.x1;
+                    const height = bbox.y2 - bbox.y1;
+                    
+                    log(`✅ Bounding box: [${bbox.x1}, ${bbox.y1}, ${bbox.x2}, ${bbox.y2}]`, 'success');
+                    log(`📐 Dimensions: ${width} x ${height} pixels`, 'info');
+                    
+                    if (width > 0 && height > 0) {
+                        log('🎉 SUCCESS: Valid bounding box with positive dimensions!', 'success');
+                    } else {
+                        log('❌ ERROR: Bounding box has zero or negative dimensions!', 'error');
+                    }
+                } else {
+                    log('❌ ERROR: No bounding box returned!', 'error');
+                }
+                
+                // Show some context from embedded text around where the match should be
+                const searchIndex = embeddedText.indexOf("(54) CIRCUIT");
+                if (searchIndex !== -1) {
+                    const context = embeddedText.substring(Math.max(0, searchIndex - 100), searchIndex + 200);
+                    log(`📍 Context around target text: "${context}"`, 'info');
+                } else {
+                    log('⚠️ Could not find target text in embedded text', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        };
+    </script>
+</body>
+</html>

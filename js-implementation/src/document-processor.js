@@ -5,7 +5,7 @@
 
 import { TextMatcher } from './text-matcher.js';
 import { HOCRParser } from './hocr-parser.js';
-import { BoundingBoxExtractor } from './bbox-extractor-fixed.js';
+import { BoundingBoxExtractor } from './bbox-extractor-simple.js';
 import { PDFAnnotator } from './pdf-annotator-browser.js';
 
 export class DocumentProcessor {
@@ -59,14 +59,11 @@ export class DocumentProcessor {
             
             this._log(`Found match with ${(matchResult.similarity * 100).toFixed(1)}% similarity: "${matchResult.text}"`);
             
-            // Step 3: Extract bounding box coordinates using original hOCR
+            // Step 3: Extract bounding box coordinates (Python algorithm)
             this._log('Extracting bounding box...');
             const boundingBox = this.bboxExtractor.extractBoundingBox(
-                hocrContent,  // Use original hOCR content
-                embeddedText, 
-                matchResult.text, 
-                matchResult.startIndex, 
-                matchResult.endIndex
+                embeddedText,     // Use embedded text like Python
+                matchResult.text  // The matched text to find
             );
             
             if (!boundingBox || (boundingBox.x1 === 0 && boundingBox.y1 === 0 && boundingBox.x2 === 0 && boundingBox.y2 === 0)) {
@@ -134,11 +131,8 @@ export class DocumentProcessor {
         let boundingBox = null;
         if (matchResult.similarity > 0) {
             boundingBox = this.bboxExtractor.extractBoundingBox(
-                hocrContent,  // Use original hOCR content
-                embeddedText, 
-                matchResult.text, 
-                matchResult.startIndex, 
-                matchResult.endIndex
+                embeddedText,     // Use embedded text like Python
+                matchResult.text  // The matched text to find
             );
         }
         
