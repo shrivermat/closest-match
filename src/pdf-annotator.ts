@@ -311,43 +311,64 @@ export class PDFAnnotator {
         
       case 'rectangle':
       default:
-        // Create rectangle annotation
-        const drawOptions: any = {
-          x,
-          y,
-          width,
-          height,
-          borderWidth: style.borderWidth,
-          borderColor: rgb(style.borderColor.r, style.borderColor.g, style.borderColor.b),
-          opacity: style.opacity
-        };
-        
-        if (style.fillColor) {
-          drawOptions.color = rgb(style.fillColor.r, style.fillColor.g, style.fillColor.b);
+        // Create selectable rectangle annotation
+        try {
+          // Get access to the PDF document context
+          const pdfDoc = (page as any).doc;
+          
+          // Create annotation dictionary
+          const annotation = pdfDoc.context.obj({
+            Type: 'Annot',
+            Subtype: 'Square',
+            Rect: [x, y, x + width, y + height],
+            C: [style.borderColor.r, style.borderColor.g, style.borderColor.b],
+            CA: style.opacity,
+            BS: {
+              W: style.borderWidth,
+              S: 'S'
+            },
+            F: 4, // Print flag
+            Contents: pdfDoc.context.obj(`Text Match: ${match.text.substring(0, 100)}...`),
+            T: pdfDoc.context.obj('TextMatch'),
+            M: pdfDoc.context.obj(new Date().toISOString()),
+            CreationDate: pdfDoc.context.obj(new Date().toISOString())
+          });
+          
+          // Register the annotation
+          const annotRef = pdfDoc.context.register(annotation);
+          
+          // Add annotation to page's annotation array
+          const existingAnnots = (page as any).node.get(pdfDoc.context.obj('Annots'));
+          if (existingAnnots) {
+            existingAnnots.push(annotRef);
+          } else {
+            (page as any).node.set(pdfDoc.context.obj('Annots'), pdfDoc.context.obj([annotRef]));
+          }
+        } catch (error) {
+          // Fallback to visual rectangle if annotation creation fails
+          console.warn('Failed to create selectable annotation, falling back to visual rectangle:', error);
+          const drawOptions: any = {
+            x,
+            y,
+            width,
+            height,
+            borderWidth: style.borderWidth,
+            borderColor: rgb(style.borderColor.r, style.borderColor.g, style.borderColor.b),
+            opacity: style.opacity
+          };
+          
+          if (style.fillColor) {
+            drawOptions.color = rgb(style.fillColor.r, style.fillColor.g, style.fillColor.b);
+          }
+          
+          page.drawRectangle(drawOptions);
         }
-        
-        page.drawRectangle(drawOptions);
         break;
     }
     
-    // Add similarity score label
-    if (style.fontSize && style.fontSize > 0) {
-      const labelText = `${(match.similarity * 100).toFixed(1)}%`;
-      const labelY = y + height + 5; // Position above the annotation
-      
-      try {
-        page.drawText(labelText, {
-          x: x,
-          y: labelY,
-          size: style.fontSize,
-          font,
-          color: rgb(style.fontColor!.r, style.fontColor!.g, style.fontColor!.b)
-        });
-      } catch (error) {
-        // Silently fail if text positioning is invalid
-        console.warn('Could not add similarity label:', error);
-      }
-    }
+    // Note: Similarity score labels removed per user request
+    // The similarity information is now embedded in the annotation's Contents property
+    // and will appear as a tooltip when hovering over the annotation
   }
 
   /**
