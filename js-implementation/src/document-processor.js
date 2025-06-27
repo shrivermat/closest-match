@@ -13,7 +13,10 @@ export class DocumentProcessor {
         this.textMatcher = new TextMatcher();
         this.hocrParser = new HOCRParser();
         this.bboxExtractor = new BoundingBoxExtractor();
-        this.pdfAnnotator = new PDFAnnotator(options.annotation || {});
+        this.pdfAnnotator = new PDFAnnotator({
+            debugMode: options.debugMode,
+            ...(options.annotation || {})
+        });
         
         // Configuration
         this.config = {

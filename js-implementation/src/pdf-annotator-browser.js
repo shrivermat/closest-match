@@ -14,6 +14,7 @@ export class PDFAnnotator {
         this.defaultAnnotationColor = options.color || this.rgb(1, 0, 0); // Red
         this.defaultAnnotationOpacity = options.opacity || 0.3;
         this.borderWidth = options.borderWidth || 2;
+        this.debugMode = options.debugMode || false;
     }
     
     // Helper to access PDFLib functions
@@ -62,16 +63,58 @@ export class PDFAnnotator {
         const opacity = options.opacity || this.defaultAnnotationOpacity;
         const borderWidth = options.borderWidth || this.borderWidth;
         
-        // Draw rectangle annotation
-        page.drawRectangle({
-            x: pdfCoords.x,
-            y: pdfCoords.y,
-            width: pdfCoords.width,
-            height: pdfCoords.height,
-            borderColor: color,
-            borderWidth: borderWidth,
-            opacity: opacity
-        });
+        // Create selectable rectangle annotation using pdf-lib's low-level API
+        try {
+            // Create annotation dictionary
+            const annotation = pdfDoc.context.obj({
+                Type: 'Annot',
+                Subtype: 'Square',
+                Rect: [
+                    pdfCoords.x,
+                    pdfCoords.y,
+                    pdfCoords.x + pdfCoords.width,
+                    pdfCoords.y + pdfCoords.height
+                ],
+                C: [color.red || color.r || 1, color.green || color.g || 0, color.blue || color.b || 0],
+                CA: opacity,
+                BS: {
+                    W: borderWidth,
+                    S: 'S'
+                },
+                F: 4, // Print flag
+                Contents: this.PDFLib.PDFString.of(options.label || 'Text Match Annotation'),
+                T: this.PDFLib.PDFString.of('TextMatch'), // Title
+                M: this.PDFLib.PDFString.of(new Date().toISOString()), // Modified date
+                CreationDate: this.PDFLib.PDFString.of(new Date().toISOString()),
+                P: page.ref // Reference to page
+            });
+            
+            // Register the annotation
+            const annotRef = pdfDoc.context.register(annotation);
+            
+            // Add annotation to page's annotation array
+            const existingAnnots = page.node.get(this.PDFLib.PDFName.of('Annots'));
+            if (existingAnnots) {
+                existingAnnots.push(annotRef);
+            } else {
+                page.node.set(this.PDFLib.PDFName.of('Annots'), pdfDoc.context.obj([annotRef]));
+            }
+            
+            this._log(`Created selectable annotation at [${pdfCoords.x}, ${pdfCoords.y}, ${pdfCoords.width}, ${pdfCoords.height}]`);
+            
+        } catch (error) {
+            // Fallback to visual rectangle if annotation creation fails
+            console.warn('Failed to create selectable annotation, falling back to visual rectangle:', error);
+            page.drawRectangle({
+                x: pdfCoords.x,
+                y: pdfCoords.y,
+                width: pdfCoords.width,
+                height: pdfCoords.height,
+                borderColor: color,
+                borderWidth: borderWidth,
+                opacity: opacity
+            });
+        }
         
         // Optionally add text label
         if (options.label) {
@@ -189,6 +232,16 @@ export class PDFAnnotator {
                 height: height
             };
         });
+    }
+    
+    /**
+     * Logging utility
+     * @private
+     */
+    _log(message) {
+        if (this.debugMode) {
+            console.log(`[PDFAnnotator] ${message}`);
+        }
     }
 }
 
