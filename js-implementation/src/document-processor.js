@@ -79,12 +79,43 @@ export class DocumentProcessor {
             // Step 4: Create PDF annotation
             this._log('Creating PDF annotation...');
             const pageNumber = options.pageNumber || 0;
+            
+            // Step 4a: Extract hOCR page dimensions automatically
+            this._log('Extracting hOCR page dimensions...');
+            const hocrPageDimensions = await this.hocrParser.getPageDimensions(hocrContent);
+            
+            if (hocrPageDimensions) {
+                this._log(`Extracted hOCR page dimensions: ${hocrPageDimensions.width} x ${hocrPageDimensions.height}`);
+            } else {
+                this._log('Could not extract hOCR page dimensions, checking PDF dimensions...');
+            }
+            
+            // Step 4b: If no hOCR dimensions, try to get PDF page dimensions
+            let finalPageDimensions = options.hocrPageSize || hocrPageDimensions;
+            
+            if (!finalPageDimensions) {
+                try {
+                    this._log('Extracting PDF page dimensions as fallback...');
+                    const pdfPagesInfo = await this.pdfAnnotator.getPagesInfo(pdfBytes);
+                    if (pdfPagesInfo && pdfPagesInfo.length > pageNumber) {
+                        const pdfPage = pdfPagesInfo[pageNumber];
+                        finalPageDimensions = {
+                            width: pdfPage.width,
+                            height: pdfPage.height
+                        };
+                        this._log(`Using PDF page dimensions: ${finalPageDimensions.width} x ${finalPageDimensions.height}`);
+                    }
+                } catch (error) {
+                    this._log(`Failed to extract PDF page dimensions: ${error.message}`);
+                }
+            }
+            
             const annotationOptions = {
                 color: options.color,
                 opacity: options.opacity,
                 borderWidth: options.borderWidth,
                 showLabel: options.showLabel,
-                hocrPageSize: options.hocrPageSize
+                hocrPageSize: finalPageDimensions  // Use three-tier fallback: provided → hOCR → PDF
             };
             
             const annotatedPdfBytes = await this.pdfAnnotator.addAnnotation(
