@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 Test Real hOCR Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px 5px; }
+        .test-case { border: 1px solid #ccc; margin: 10px 0; padding: 15px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Test Real hOCR Data</h1>
+    <p>Testing WASM with actual diverse hOCR coordinates to prove it's not hardcoded.</p>
+    
+    <button onclick="testCase1()">📄 Test Case 1: Top Left</button>
+    <button onclick="testCase2()">📄 Test Case 2: Center</button>
+    <button onclick="testCase3()">📄 Test Case 3: Bottom Right</button>
+    <button onclick="testCase4()">📄 Test Case 4: Multi-line</button>
+    
+    <div id="results"></div>
+
+    <script src="./pkg-nomodules/document_annotator.js"></script>
+    
+    <script>
+        let wasmInitialized = false;
+        
+        async function initializeWasm() {
+            if (!wasmInitialized) {
+                await wasm_bindgen('./pkg-nomodules/document_annotator_bg.wasm');
+                wasmInitialized = true;
+                console.log('✅ WASM initialized, version:', wasm_bindgen.get_version());
+            }
+        }
+        
+        async function runTest(testName, hocrContent, searchQuery, expectedPattern) {
+            try {
+                await initializeWasm();
+                
+                console.log(`🧪 ${testName}: Testing "${searchQuery}"`);
+                console.log('📄 hOCR:', hocrContent);
+                
+                const result = wasm_bindgen.extract_bounding_box_from_hocr(hocrContent, searchQuery);
+                
+                let output = `<div class="test-case">`;
+                output += `<h3>${testName}</h3>`;
+                output += `<p><strong>Search:</strong> "${searchQuery}"</p>`;
+                
+                if (result) {
+                    const coords = [result.x1, result.y1, result.x2, result.y2];
+                    output += `<p><strong>✅ Result:</strong> [${coords.join(', ')}]</p>`;
+                    output += `<p><strong>Width:</strong> ${result.x2 - result.x1}px, <strong>Height:</strong> ${result.y2 - result.y1}px</p>`;
+                    
+                    // Check if coordinates match expected pattern
+                    const meetsExpectation = expectedPattern(coords);
+                    if (meetsExpectation) {
+                        output += '<p style="color: green;"><strong>✅ Coordinates match expected location!</strong></p>';
+                    } else {
+                        output += '<p style="color: orange;"><strong>⚠️ Coordinates don\'t match expected pattern</strong></p>';
+                    }
+                } else {
+                    output += '<p style="color: red;"><strong>❌ No result returned</strong></p>';
+                }
+                
+                output += `<details><summary>hOCR Content</summary><pre>${hocrContent}</pre></details>`;
+                output += '</div>';
+                
+                return output;
+                
+            } catch (error) {
+                console.error(`💥 ${testName} failed:`, error);
+                return `<div class="error"><h3>${testName}</h3><p>❌ Error: ${error.message}</p></div>`;
+            }
+        }
+        
+        async function testCase1() {
+            // Test Case 1: Top-left area of document
+            const hocrContent = `
+                <p class='ocr_par'>
+                    <span class='ocr_line' title='bbox 50 100 400 130'>
+                        <span class='ocrx_word' title='bbox 50 100 150 130'>Document</span>
+                        <span class='ocrx_word' title='bbox 160 100 250 130'>Title</span>
+                        <span class='ocrx_word' title='bbox 260 100 350 130'>Header</span>
+                    </span>
+                </p>
+            `;
+            
+            const result = await runTest(
+                "📄 Test Case 1: Top Left",
+                hocrContent,
+                "Document Title",
+                (coords) => coords[0] === 50 && coords[1] === 100 && coords[2] === 250 && coords[3] === 130
+            );
+            
+            document.getElementById('results').innerHTML = result;
+        }
+        
+        async function testCase2() {
+            // Test Case 2: Center area of document
+            const hocrContent = `
+                <p class='ocr_par'>
+                    <span class='ocr_line' title='bbox 300 400 800 450'>
+                        <span class='ocrx_word' title='bbox 300 400 420 450'>important</span>
+                        <span class='ocrx_word' title='bbox 430 400 550 450'>information</span>
+                        <span class='ocrx_word' title='bbox 560 400 680 450'>located</span>
+                        <span class='ocrx_word' title='bbox 690 400 780 450'>here</span>
+                    </span>
+                </p>
+            `;
+            
+            const result = await runTest(
+                "📄 Test Case 2: Center",
+                hocrContent,
+                "important information",
+                (coords) => coords[0] === 300 && coords[1] === 400 && coords[2] === 550 && coords[3] === 450
+            );
+            
+            document.getElementById('results').innerHTML = result;
+        }
+        
+        async function testCase3() {
+            // Test Case 3: Bottom-right area
+            const hocrContent = `
+                <p class='ocr_par'>
+                    <span class='ocr_line' title='bbox 600 700 1000 750'>
+                        <span class='ocrx_word' title='bbox 600 700 700 750'>Contact</span>
+                        <span class='ocrx_word' title='bbox 710 700 850 750'>Information</span>
+                        <span class='ocrx_word' title='bbox 860 700 950 750'>Footer</span>
+                    </span>
+                </p>
+            `;
+            
+            const result = await runTest(
+                "📄 Test Case 3: Bottom Right",
+                hocrContent,
+                "Contact Information",
+                (coords) => coords[0] === 600 && coords[1] === 700 && coords[2] === 850 && coords[3] === 750
+            );
+            
+            document.getElementById('results').innerHTML = result;
+        }
+        
+        async function testCase4() {
+            // Test Case 4: Multi-line spanning different Y coordinates
+            const hocrContent = `
+                <p class='ocr_par'>
+                    <span class='ocr_line' title='bbox 100 200 500 230'>
+                        <span class='ocrx_word' title='bbox 100 200 200 230'>This</span>
+                        <span class='ocrx_word' title='bbox 210 200 250 230'>is</span>
+                        <span class='ocrx_word' title='bbox 260 200 280 230'>a</span>
+                    </span>
+                    <span class='ocr_line' title='bbox 100 240 500 270'>
+                        <span class='ocrx_word' title='bbox 100 240 200 270'>multi-line</span>
+                        <span class='ocrx_word' title='bbox 210 240 300 270'>text</span>
+                        <span class='ocrx_word' title='bbox 310 240 400 270'>example</span>
+                    </span>
+                </p>
+            `;
+            
+            const result = await runTest(
+                "📄 Test Case 4: Multi-line",
+                hocrContent,
+                "multi-line text",
+                (coords) => coords[0] === 100 && coords[1] === 240 && coords[2] === 300 && coords[3] === 270
+            );
+            
+            document.getElementById('results').innerHTML = result;
+        }
+    </script>
+</body>
+</html>

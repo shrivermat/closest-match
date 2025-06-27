@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Real WASM Coordinate Extraction</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Real WASM Coordinate Extraction</h1>
+    <button onclick="testCoordinateExtraction()">Test Real Coordinate Extraction</button>
+    <div id="results"></div>
+
+    <!-- Load WASM -->
+    <script src="./pkg-nomodules/document_annotator.js"></script>
+    
+    <script>
+        async function testCoordinateExtraction() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                // Initialize WASM
+                await wasm_bindgen('./pkg-nomodules/document_annotator_bg.wasm');
+                
+                // Test different search queries
+                const testCases = [
+                    { query: "voltage regulator", description: "Two words" },
+                    { query: "circuit", description: "Single word" },
+                    { query: "confidential information", description: "Business terms" },
+                    { query: "user interface", description: "Technical terms" }
+                ];
+                
+                let results = '<div class="success"><h3>✅ WASM Initialized Successfully</h3></div>';
+                
+                for (const test of testCases) {
+                    // Create sample hOCR for each test
+                    const words = test.query.split(' ');
+                    let x = 150;
+                    const wordSpans = words.map(word => {
+                        const wordSpan = `<span class='ocrx_word' title='bbox ${x} 200 ${x + word.length * 12} 230'>${word}</span>`;
+                        x += word.length * 12 + 10; // word width + spacing
+                        return wordSpan;
+                    }).join('');
+                    
+                    const sampleHOCR = `<p class='ocr_par'>
+                        <span class='ocr_line' title='bbox 100 200 500 230'>
+                            ${wordSpans}
+                        </span>
+                    </p>`;
+                    
+                    try {
+                        // Test word-level extraction
+                        const result = wasm_bindgen.extract_bounding_box_from_hocr(sampleHOCR, test.query);
+                        
+                        if (result) {
+                            results += `<div class="success">
+                                <h4>✅ ${test.description}: "${test.query}"</h4>
+                                <p><strong>Extracted coordinates:</strong> [${result.x1}, ${result.y1}, ${result.x2}, ${result.y2}]</p>
+                                <p><strong>Width:</strong> ${result.x2 - result.x1}px, <strong>Height:</strong> ${result.y2 - result.y1}px</p>
+                            </div>`;
+                        } else {
+                            results += `<div class="error">
+                                <h4>❌ ${test.description}: "${test.query}"</h4>
+                                <p>No coordinates extracted</p>
+                            </div>`;
+                        }
+                        
+                        // Also test text matching
+                        const embeddedText = `[[PARAGRAPH]] [[LINE 150 200 400 230]] Sample ${test.query} content`;
+                        const matchResult = wasm_bindgen.find_closest_match(embeddedText, test.query);
+                        
+                        if (matchResult) {
+                            results += `<div class="success">
+                                <p><strong>Text match similarity:</strong> ${(matchResult.similarity * 100).toFixed(1)}%</p>
+                                <p><strong>Matched text:</strong> "${matchResult.text}"</p>
+                            </div>`;
+                        }
+                        
+                    } catch (error) {
+                        results += `<div class="error">
+                            <h4>❌ ${test.description}: "${test.query}"</h4>
+                            <p>Error: ${error.message}</p>
+                        </div>`;
+                    }
+                }
+                
+                // Show version info
+                results += `<div class="success">
+                    <h3>📦 WASM Version Info</h3>
+                    <p><strong>Version:</strong> ${wasm_bindgen.get_version()}</p>
+                    <p><strong>Package:</strong> ${wasm_bindgen.get_package_name()}</p>
+                </div>`;
+                
+                resultsDiv.innerHTML = results;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Test failed: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

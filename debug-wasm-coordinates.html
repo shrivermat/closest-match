@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug WASM Coordinate Extraction</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test { margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+        .info { background-color: #d1ecf1; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug WASM Coordinate Extraction</h1>
+    <button onclick="debugCoordinates()">Run Debug Tests</button>
+    <div id="results"></div>
+
+    <script src="./pkg-nomodules/document_annotator.js"></script>
+    
+    <script>
+        async function debugCoordinates() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Running debug tests...</p>';
+            
+            try {
+                // Initialize WASM
+                await wasm_bindgen('./pkg-nomodules/document_annotator_bg.wasm');
+                
+                let output = '<div class="test success"><h3>✅ WASM Initialized</h3>';
+                output += `<p>Version: ${wasm_bindgen.get_version()}</p></div>`;
+                
+                // Test 1: Simple hOCR structure
+                const testQuery = "voltage regulator";
+                const simpleHOCR = `<p class='ocr_par'>
+                    <span class='ocr_line' title='bbox 100 200 500 230'>
+                        <span class='ocrx_word' title='bbox 150 200 220 230'>voltage</span>
+                        <span class='ocrx_word' title='bbox 230 200 320 230'>regulator</span>
+                    </span>
+                </p>`;
+                
+                output += '<div class="test info"><h3>🧪 Test 1: Simple hOCR Structure</h3>';
+                output += `<p><strong>Query:</strong> "${testQuery}"</p>`;
+                output += `<p><strong>hOCR:</strong></p><pre>${simpleHOCR}</pre>`;
+                
+                try {
+                    console.log('Testing extract_bounding_box_from_hocr with:', simpleHOCR, testQuery);
+                    const result = wasm_bindgen.extract_bounding_box_from_hocr(simpleHOCR, testQuery);
+                    console.log('Result from WASM:', result);
+                    
+                    if (result) {
+                        output += `<div class="success">
+                            <p><strong>✅ Success!</strong></p>
+                            <p><strong>Coordinates:</strong> [${result.x1}, ${result.y1}, ${result.x2}, ${result.y2}]</p>
+                            <p><strong>Width:</strong> ${result.x2 - result.x1}, <strong>Height:</strong> ${result.y2 - result.y1}</p>
+                        </div>`;
+                    } else {
+                        output += '<div class="error"><p><strong>❌ No result returned</strong></p></div>';
+                    }
+                } catch (error) {
+                    console.error('Error in word-level extraction:', error);
+                    output += `<div class="error"><p><strong>❌ Error:</strong> ${error.message}</p></div>`;
+                }
+                output += '</div>';
+                
+                // Test 2: Legacy method
+                output += '<div class="test info"><h3>🧪 Test 2: Legacy Method</h3>';
+                const embeddedText = "[[PARAGRAPH]] [[LINE 150 200 320 230]] voltage regulator circuit";
+                output += `<p><strong>Embedded Text:</strong> ${embeddedText}</p>`;
+                
+                try {
+                    console.log('Testing extract_bounding_box with:', embeddedText, testQuery);
+                    const result = wasm_bindgen.extract_bounding_box(embeddedText, testQuery);
+                    console.log('Legacy result:', result);
+                    
+                    if (result) {
+                        output += `<div class="success">
+                            <p><strong>✅ Success!</strong></p>
+                            <p><strong>Coordinates:</strong> [${result.x1}, ${result.y1}, ${result.x2}, ${result.y2}]</p>
+                            <p><strong>Width:</strong> ${result.x2 - result.x1}, <strong>Height:</strong> ${result.y2 - result.y1}</p>
+                        </div>`;
+                    } else {
+                        output += '<div class="error"><p><strong>❌ No result returned</strong></p></div>';
+                    }
+                } catch (error) {
+                    console.error('Error in legacy extraction:', error);
+                    output += `<div class="error"><p><strong>❌ Error:</strong> ${error.message}</p></div>`;
+                }
+                output += '</div>';
+                
+                // Test 3: Text matching
+                output += '<div class="test info"><h3>🧪 Test 3: Text Matching</h3>';
+                try {
+                    const matchResult = wasm_bindgen.find_closest_match(embeddedText, testQuery);
+                    console.log('Match result:', matchResult);
+                    
+                    if (matchResult) {
+                        output += `<div class="success">
+                            <p><strong>✅ Match found!</strong></p>
+                            <p><strong>Text:</strong> "${matchResult.text}"</p>
+                            <p><strong>Similarity:</strong> ${(matchResult.similarity * 100).toFixed(2)}%</p>
+                            <p><strong>Indices:</strong> ${matchResult.start_index} - ${matchResult.end_index}</p>
+                        </div>`;
+                    } else {
+                        output += '<div class="error"><p><strong>❌ No match found</strong></p></div>';
+                    }
+                } catch (error) {
+                    console.error('Error in text matching:', error);
+                    output += `<div class="error"><p><strong>❌ Error:</strong> ${error.message}</p></div>`;
+                }
+                output += '</div>';
+                
+                // Test 4: Check what functions are available
+                output += '<div class="test info"><h3>🧪 Test 4: Available WASM Functions</h3>';
+                output += '<p><strong>Available functions:</strong></p><ul>';
+                const wasmFunctions = [
+                    'extract_bounding_box_from_hocr',
+                    'extract_bounding_box', 
+                    'find_closest_match',
+                    'get_version',
+                    'get_package_name'
+                ];
+                
+                wasmFunctions.forEach(func => {
+                    const available = typeof wasm_bindgen[func] === 'function';
+                    output += `<li>${func}: ${available ? '✅' : '❌'}</li>`;
+                });
+                output += '</ul></div>';
+                
+                resultsDiv.innerHTML = output;
+                
+            } catch (error) {
+                console.error('Debug test failed:', error);
+                resultsDiv.innerHTML = `<div class="test error">❌ Debug failed: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

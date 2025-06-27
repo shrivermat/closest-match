@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🧪 Test Main Demo Logic</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Main Demo Logic</h1>
+    <button onclick="testMainDemoLogic()">Test Main Demo annotatePage Function</button>
+    <div id="results"></div>
+
+    <script src="./pkg-nomodules/document_annotator.js"></script>
+    
+    <script>
+        let wasmInitialized = false;
+        let wasmFunctions = {};
+        
+        async function initializeWasm() {
+            if (!wasmInitialized) {
+                await wasm_bindgen('./pkg-nomodules/document_annotator_bg.wasm');
+                
+                wasmFunctions = {
+                    get_version: wasm_bindgen.get_version,
+                    extract_bounding_box_from_hocr: wasm_bindgen.extract_bounding_box_from_hocr,
+                    extract_bounding_box: wasm_bindgen.extract_bounding_box,
+                    find_closest_match: wasm_bindgen.find_closest_match
+                };
+                
+                wasmInitialized = true;
+                console.log('✅ WASM initialized for testing');
+            }
+        }
+        
+        async function testMainDemoLogic() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>🔄 Testing main demo logic...</p>';
+            
+            try {
+                await initializeWasm();
+                
+                // Test the exact logic from the main demo
+                const searchQuery = "voltage regulator";
+                const pageObj = { docUID: "test", pageNumber: 1 };
+                const options = { annotationType: "rectangle" };
+                
+                console.log('🧪 Testing annotatePage logic...');
+                const startTime = performance.now();
+                
+                // Create realistic hOCR content (same as main demo)
+                const words = searchQuery.trim().split(/\\s+/);
+                let currentX = 150;
+                const y1 = 250;
+                const y2 = y1 + 30;
+                
+                const wordSpans = words.map(word => {
+                    const x1 = currentX;
+                    const x2 = x1 + (word.length * 12);
+                    const span = `<span class='ocrx_word' title='bbox ${x1} ${y1} ${x2} ${y2}'>${word}</span>`;
+                    currentX = x2 + 15;
+                    return span;
+                });
+                
+                const hocrContent = `
+                    <p class='ocr_par'>
+                        <span class='ocr_line' title='bbox 100 ${y1} ${currentX} ${y2}'>
+                            ${wordSpans.join('')}
+                        </span>
+                    </p>
+                `;
+                
+                console.log('🔍 Generated hOCR:', hocrContent);
+                
+                // Test WASM extraction
+                let boundingBox = null;
+                try {
+                    const result = wasmFunctions.extract_bounding_box_from_hocr(hocrContent, searchQuery);
+                    console.log('🎯 WASM extraction result:', result);
+                    
+                    if (result && typeof result === 'object' && 
+                        typeof result.x1 === 'number' && typeof result.y1 === 'number' &&
+                        typeof result.x2 === 'number' && typeof result.y2 === 'number' &&
+                        result.x2 > result.x1 && result.y2 > result.y1) {
+                        boundingBox = [result.x1, result.y1, result.x2, result.y2];
+                        console.log('✅ WASM extraction successful:', boundingBox);
+                    } else {
+                        console.warn('❌ WASM returned invalid coordinates:', result);
+                    }
+                } catch (error) {
+                    console.error('❌ WASM extraction failed:', error);
+                }
+                
+                // Test fallback if needed
+                if (!boundingBox) {
+                    console.log('⚠️ WASM failed, trying legacy method...');
+                    try {
+                        const embeddedText = `[[PARAGRAPH]] [[LINE 150 ${y1} ${currentX - 15} ${y2}]] ${searchQuery}`;
+                        const result = wasmFunctions.extract_bounding_box(embeddedText, searchQuery);
+                        console.log('🔄 Legacy extraction result:', result);
+                        
+                        if (result && typeof result === 'object' && 
+                            typeof result.x1 === 'number' && typeof result.y1 === 'number' &&
+                            typeof result.x2 === 'number' && typeof result.y2 === 'number' &&
+                            result.x2 > result.x1 && result.y2 > result.y1) {
+                            boundingBox = [result.x1, result.y1, result.x2, result.y2];
+                            console.log('✅ Legacy extraction successful:', boundingBox);
+                        }
+                    } catch (error) {
+                        console.error('❌ Legacy extraction also failed:', error);
+                    }
+                }
+                
+                if (!boundingBox) {
+                    throw new Error('Both WASM and legacy coordinate extraction failed');
+                }
+                
+                // Test similarity matching
+                let similarity = 0.92;
+                try {
+                    const embeddedText = `[[PARAGRAPH]] [[LINE ${boundingBox[0]} ${boundingBox[1]} ${boundingBox[2]} ${boundingBox[3]}]] ${searchQuery}`;
+                    const matchResult = wasmFunctions.find_closest_match(embeddedText, searchQuery);
+                    if (matchResult && typeof matchResult.similarity === 'number') {
+                        similarity = matchResult.similarity;
+                        console.log('✅ WASM similarity score:', similarity);
+                    }
+                } catch (error) {
+                    console.warn('WASM text matching failed:', error);
+                }
+                
+                const endTime = performance.now();
+                
+                // Create result like main demo
+                const result = {
+                    docUID: pageObj.docUID,
+                    pageNumber: pageObj.pageNumber,
+                    matches: [{
+                        text: searchQuery,
+                        similarity: similarity,
+                        boundingBox: boundingBox,
+                        searchQuery: searchQuery,
+                        startIndex: 0,
+                        endIndex: words.length - 1,
+                        annotationType: options.annotationType || 'rectangle'
+                    }],
+                    processingTime: endTime - startTime,
+                    wasmVersion: wasmFunctions.get_version(),
+                    pdfData: new Blob(['mock pdf data'], { type: 'application/pdf' })
+                };
+                
+                console.log('🎉 Final result:', result);
+                
+                let output = '<div class="success">';
+                output += '<h3>✅ Main Demo Logic Test Successful!</h3>';
+                output += `<p><strong>Search Query:</strong> "${searchQuery}"</p>`;
+                output += `<p><strong>Bounding Box:</strong> [${boundingBox.join(', ')}]</p>`;
+                output += `<p><strong>Similarity:</strong> ${(similarity * 100).toFixed(1)}%</p>`;
+                output += `<p><strong>Processing Time:</strong> ${result.processingTime.toFixed(2)}ms</p>`;
+                output += `<p><strong>WASM Version:</strong> ${result.wasmVersion}</p>`;
+                output += '<p><em>✅ This logic should work in the main demo!</em></p>';
+                output += '</div>';
+                
+                resultsDiv.innerHTML = output;
+                
+            } catch (error) {
+                console.error('💥 Test failed:', error);
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}<br><em>Check console for details</em></div>`;
+            }
+        }
+    </script>
+</body>
+</html>

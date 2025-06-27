@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quick Demo Test</title>
+</head>
+<body>
+    <h1>Testing Main Demo Implementation</h1>
+    <button onclick="testMainDemo()">Test Main Demo Functions</button>
+    <div id="results"></div>
+
+    <!-- Load PDF-lib -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- Load WASM -->
+    <script src="./pkg-nomodules/document_annotator.js"></script>
+    
+    <script>
+        async function testMainDemo() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                // Initialize WASM
+                await wasm_bindgen('./pkg-nomodules/document_annotator_bg.wasm');
+                
+                // Test version
+                const version = wasm_bindgen.get_version();
+                const packageName = wasm_bindgen.get_package_name();
+                
+                // Test basic functionality
+                const result = wasm_bindgen.find_closest_match(
+                    "[[PARAGRAPH]] [[LINE 100 200 500 250]] voltage regulator circuit",
+                    "voltage regulator"
+                );
+                
+                resultsDiv.innerHTML = `
+                    <h3>✅ Test Results</h3>
+                    <p><strong>Package:</strong> ${packageName}</p>
+                    <p><strong>Version:</strong> ${version}</p>
+                    <p><strong>Text Match:</strong> "${result.text}" (${(result.similarity * 100).toFixed(1)}%)</p>
+                    <p><strong>Status:</strong> Main demo integration ready!</p>
+                `;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

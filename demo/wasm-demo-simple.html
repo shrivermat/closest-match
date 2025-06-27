@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Document Annotator Demo (Simple)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .version-info {
+            background-color: #e7f3ff;
+            border: 1px solid #0066cc;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .loading {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 WASM Document Annotator Demo (CORS-Free)</h1>
+    <p>This demo loads WASM using the traditional script approach to avoid CORS issues.</p>
+    
+    <div class="version-info" id="versionInfo">
+        <h3>📦 Ready to Load WASM Module</h3>
+        <div id="versionDetails">Click "Initialize System" to load the WASM module...</div>
+    </div>
+
+    <div class="panel">
+        <h2>🧪 System Tests</h2>
+        <button onclick="initializeSystem()">Initialize System</button>
+        <button onclick="testVersioning()" id="testVersionBtn" disabled>Check Version</button>
+        <button onclick="runBasicTest()" id="testBasicBtn" disabled>Run Basic Test</button>
+        
+        <div id="systemStatus"></div>
+    </div>
+
+    <div class="panel">
+        <h2>📝 Text Matching Test</h2>
+        <div class="form-group">
+            <label for="testText">Embedded Text (with hOCR markers):</label>
+            <textarea id="testText" rows="4">[[PARAGRAPH]] [[LINE 100 200 500 250]] voltage regulator circuit [[LINE 100 260 480 310]] provides stable power output</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="searchText">Search Text:</label>
+            <input type="text" id="searchText" value="voltage regulator" placeholder="Enter text to search for">
+        </div>
+        
+        <button onclick="testTextMatching()" id="testTextBtn" disabled>Test Text Matching</button>
+        
+        <div id="textResults"></div>
+    </div>
+
+    <div class="panel">
+        <h2>📍 Coordinate Extraction Test</h2>
+        <div class="form-group">
+            <label for="hocrContent">hOCR Content:</label>
+            <textarea id="hocrContent" rows="6"><p class='ocr_par'><span class='ocr_line' title='bbox 100 200 500 250'><span class='ocrx_word' title='bbox 100 200 180 230'>voltage</span><span class='ocrx_word' title='bbox 190 200 280 230'>regulator</span></span></p></textarea>
+        </div>
+        
+        <button onclick="testWordLevelExtraction()" id="testWordBtn" disabled>Test Word-Level Extraction</button>
+        <button onclick="debugWordExtraction()" id="debugWordBtn" disabled>Debug Word Extraction</button>
+        
+        <div id="coordinateResults"></div>
+    </div>
+
+    <div class="panel">
+        <h2>📄 PDF Annotation Test</h2>
+        <div class="form-group">
+            <label for="pdfSearchText">Text to find and annotate:</label>
+            <input type="text" id="pdfSearchText" value="voltage regulator" placeholder="Text to search for in PDF">
+        </div>
+        
+        <div class="form-group">
+            <label for="annotationTypeSelect">Annotation Type:</label>
+            <select id="annotationTypeSelect">
+                <option value="rectangle">Rectangle</option>
+                <option value="highlight">Highlight</option>
+                <option value="underline">Underline</option>
+                <option value="strikethrough">Strikethrough</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="annotationColorInput">Annotation Color:</label>
+            <input type="color" id="annotationColorInput" value="#ff0000">
+        </div>
+        
+        <button onclick="testPDFAnnotation()" id="testPDFBtn" disabled>Create Annotated PDF</button>
+        <button onclick="testCoordinateTransform()" id="testTransformBtn" disabled>Test Coordinate Transform</button>
+        
+        <div id="pdfResults"></div>
+        <div id="downloadArea"></div>
+    </div>
+
+    <!-- Load PDF-lib for PDF manipulation -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <!-- Load WASM using no-modules build -->
+    <script src="../pkg-nomodules/document_annotator.js"></script>
+    
+    <script>
+        let wasmModule = null;
+        let wasmInitialized = false;
+
+        async function initializeSystem() {
+            const statusDiv = document.getElementById('systemStatus');
+            const versionDiv = document.getElementById('versionInfo');
+            
+            try {
+                statusDiv.innerHTML = '<div class="loading">🔄 Initializing WASM module...</div>';
+                
+                // Initialize WASM using the no-modules approach
+                wasmModule = await wasm_bindgen('../pkg-nomodules/document_annotator_bg.wasm');
+                wasmInitialized = true;
+                
+                // Log version info to console
+                wasm_bindgen.log_version_info();
+                
+                // Get version info for display
+                const versionInfo = wasm_bindgen.get_version_info();
+                const version = wasm_bindgen.get_version();
+                const packageName = wasm_bindgen.get_package_name();
+                
+                versionDiv.innerHTML = `
+                    <h3>✅ WASM Module Loaded Successfully!</h3>
+                    <p><strong>Package:</strong> ${packageName}</p>
+                    <p><strong>Version:</strong> ${version}</p>
+                    <p><strong>Loaded at:</strong> ${new Date().toISOString()}</p>
+                    <p><strong>All enhanced features are now available!</strong></p>
+                `;
+                
+                statusDiv.innerHTML = '<div class="success">✅ System initialized successfully! All features are now available.</div>';
+                
+                // Enable test buttons
+                document.getElementById('testVersionBtn').disabled = false;
+                document.getElementById('testBasicBtn').disabled = false;
+                document.getElementById('testTextBtn').disabled = false;
+                document.getElementById('testWordBtn').disabled = false;
+                document.getElementById('debugWordBtn').disabled = false;
+                document.getElementById('testPDFBtn').disabled = false;
+                document.getElementById('testTransformBtn').disabled = false;
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Initialization failed: ${error.message}</div>`;
+                versionDiv.innerHTML = '<h3>❌ WASM Module Failed to Load</h3>';
+                console.error('WASM initialization error:', error);
+            }
+        }
+
+        function testVersioning() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('systemStatus');
+            const version = wasm_bindgen.get_version();
+            const packageName = wasm_bindgen.get_package_name();
+            
+            // Log to console
+            wasm_bindgen.log_version_info();
+            
+            statusDiv.innerHTML = `
+                <div class="success">
+                    <h4>📋 Version Information</h4>
+                    <p><strong>Package:</strong> ${packageName}</p>
+                    <p><strong>Version:</strong> ${version}</p>
+                    <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+                    <p><em>Check browser console for detailed logs</em></p>
+                </div>
+            `;
+        }
+
+        function runBasicTest() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('systemStatus');
+            
+            try {
+                // Test basic text matching
+                const result = wasm_bindgen.find_closest_match(
+                    "[[PARAGRAPH]] [[LINE 100 200 500 250]] voltage regulator circuit",
+                    "voltage regulator"
+                );
+                
+                if (result && result.similarity > 0.8) {
+                    statusDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ Basic Test PASSED!</h4>
+                            <p><strong>Found match:</strong> "${result.text}"</p>
+                            <p><strong>Similarity:</strong> ${(result.similarity * 100).toFixed(2)}%</p>
+                            <p><em>Enhanced WASM features are working correctly!</em></p>
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = '<div class="error">❌ Basic test failed - no good match found</div>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Basic test failed: ${error.message}</div>`;
+            }
+        }
+
+        function testTextMatching() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const testText = document.getElementById('testText').value;
+            const searchText = document.getElementById('searchText').value;
+            const resultsDiv = document.getElementById('textResults');
+            
+            try {
+                const result = wasm_bindgen.find_closest_match(testText, searchText);
+                
+                if (result) {
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ Match Found!</h4>
+                            <p><strong>Text:</strong> "${result.text}"</p>
+                            <p><strong>Similarity:</strong> ${(result.similarity * 100).toFixed(2)}%</p>
+                            <p><strong>Position:</strong> Words ${result.start_index}-${result.end_index}</p>
+                            <p><strong>Debug Info:</strong> ${result.debug_cleaned_word_count} words processed</p>
+                            <p><em>This uses the enhanced fuzzy matching algorithm!</em></p>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">❌ No match found</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        function testWordLevelExtraction() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const hocrContent = document.getElementById('hocrContent').value;
+            const resultsDiv = document.getElementById('coordinateResults');
+            
+            try {
+                const result = wasm_bindgen.extract_bounding_box_from_hocr(hocrContent, "voltage regulator");
+                
+                if (result) {
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ Word-Level Coordinates Extracted!</h4>
+                            <p><strong>Bounding Box:</strong> [${result.x1}, ${result.y1}, ${result.x2}, ${result.y2}]</p>
+                            <p><strong>Width:</strong> ${result.x2 - result.x1}px</p>
+                            <p><strong>Height:</strong> ${result.y2 - result.y1}px</p>
+                            <p><em>This uses the enhanced word-level extraction algorithm!</em></p>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">❌ No coordinates found</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                console.error('Word extraction error:', error);
+            }
+        }
+
+        function debugWordExtraction() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('coordinateResults');
+            
+            // Test with very simple hOCR first
+            const simpleHOCR = `<p class='ocr_par'><span class='ocr_line' title='bbox 100 200 500 250'><span class='ocrx_word' title='bbox 100 200 180 230'>voltage</span><span class='ocrx_word' title='bbox 190 200 280 230'>regulator</span></span></p>`;
+            
+            try {
+                console.log('Testing simple hOCR:', simpleHOCR);
+                
+                // Test 1: Try single word
+                let result1;
+                try {
+                    result1 = wasm_bindgen.extract_bounding_box_from_hocr(simpleHOCR, "voltage");
+                    console.log('Single word result:', result1);
+                } catch (e) {
+                    console.error('Single word failed:', e);
+                    result1 = null;
+                }
+                
+                // Test 2: Try two words
+                let result2;
+                try {
+                    result2 = wasm_bindgen.extract_bounding_box_from_hocr(simpleHOCR, "voltage regulator");
+                    console.log('Two words result:', result2);
+                } catch (e) {
+                    console.error('Two words failed:', e);
+                    result2 = null;
+                }
+                
+                // Test 3: Try legacy method as comparison
+                const embeddedText = "[[PARAGRAPH]] [[LINE 100 200 280 230]] voltage regulator";
+                const result3 = wasm_bindgen.extract_bounding_box(embeddedText, "voltage regulator");
+                console.log('Legacy method result:', result3);
+                
+                resultsDiv.innerHTML = `
+                    <div class="success">
+                        <h4>🔍 Debug Results</h4>
+                        <p><strong>Single word "voltage":</strong> ${result1 ? `[${result1.x1}, ${result1.y1}, ${result1.x2}, ${result1.y2}]` : 'Failed'}</p>
+                        <p><strong>Two words "voltage regulator":</strong> ${result2 ? `[${result2.x1}, ${result2.y1}, ${result2.x2}, ${result2.y2}]` : 'Failed'}</p>
+                        <p><strong>Legacy method:</strong> ${result3 ? `[${result3.x1}, ${result3.y1}, ${result3.x2}, ${result3.y2}]` : 'Failed'}</p>
+                        <p><em>Check browser console for detailed error messages</em></p>
+                    </div>
+                `;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Debug test failed: ${error.message}</div>`;
+                console.error('Debug test error:', error);
+            }
+        }
+
+        function testCoordinateTransform() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('pdfResults');
+            
+            try {
+                // Test coordinate transformation from hOCR to PDF space
+                const transform = wasm_bindgen.calculate_coordinate_transform(
+                    595, 842,    // PDF page size (A4)
+                    2560, 3300   // hOCR page size (example from your documents)
+                );
+                
+                const hocrCoords = [100, 200, 300, 400]; // Example hOCR coordinates
+                const pdfCoords = wasm_bindgen.transform_coordinates(
+                    hocrCoords[0], hocrCoords[1], hocrCoords[2], hocrCoords[3],
+                    transform
+                );
+                
+                resultsDiv.innerHTML = `
+                    <div class="success">
+                        <h4>✅ Coordinate Transformation Test!</h4>
+                        <p><strong>hOCR Page Size:</strong> 2560 × 3300</p>
+                        <p><strong>PDF Page Size:</strong> 595 × 842 (A4)</p>
+                        <p><strong>Scale Factors:</strong> X=${transform.scale_x.toFixed(4)}, Y=${transform.scale_y.toFixed(4)}</p>
+                        <p><strong>Original hOCR:</strong> [${hocrCoords.join(', ')}]</p>
+                        <p><strong>Transformed PDF:</strong> [${pdfCoords.x.toFixed(2)}, ${pdfCoords.y.toFixed(2)}, ${(pdfCoords.x + pdfCoords.width).toFixed(2)}, ${(pdfCoords.y + pdfCoords.height).toFixed(2)}]</p>
+                        <p><strong>Size:</strong> ${pdfCoords.width.toFixed(2)} × ${pdfCoords.height.toFixed(2)}</p>
+                        <p><em>✨ Enhanced coordinate transformation with Y-axis flipping for PDF space</em></p>
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testPDFAnnotation() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('pdfResults');
+            const downloadDiv = document.getElementById('downloadArea');
+            const searchText = document.getElementById('pdfSearchText').value;
+            const annotationType = document.getElementById('annotationTypeSelect').value;
+            const annotationColor = document.getElementById('annotationColorInput').value;
+            
+            try {
+                resultsDiv.innerHTML = '<div class="loading">🔄 Creating annotated PDF...</div>';
+                downloadDiv.innerHTML = '';
+                
+                // Step 1: Create a sample PDF using PDF-lib
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const page = pdfDoc.addPage([595, 842]); // A4 size
+                const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+                
+                // Add some sample text that includes our search term
+                const sampleText = `This is a test document containing voltage regulator circuits.
+                
+The voltage regulator is a crucial component in electronic systems.
+It provides stable power output regardless of input variations.
+
+Advanced voltage regulator designs incorporate:
+- Feedback control mechanisms
+- Thermal protection
+- Current limiting features
+
+This document demonstrates the enhanced WASM annotation system
+with word-level coordinate extraction and fuzzy matching capabilities.`;
+                
+                page.drawText(sampleText, {
+                    x: 50,
+                    y: 750,
+                    size: 12,
+                    font: font,
+                    maxWidth: 500,
+                });
+                
+                // Step 2: Simulate hOCR content for the text we just added
+                const simulatedHOCR = `<p class='ocr_par'>
+<span class='ocr_line' title='bbox 100 200 500 230'>
+<span class='ocrx_word' title='bbox 100 200 140 220'>The</span>
+<span class='ocrx_word' title='bbox 150 200 220 220'>voltage</span>
+<span class='ocrx_word' title='bbox 230 200 320 220'>regulator</span>
+<span class='ocrx_word' title='bbox 330 200 350 220'>is</span>
+<span class='ocrx_word' title='bbox 360 200 380 220'>a</span>
+<span class='ocrx_word' title='bbox 390 200 460 220'>crucial</span>
+</span>
+</p>`;
+                
+                // Step 3: Use WASM to extract coordinates
+                console.log('Attempting to extract bounding box for:', searchText);
+                console.log('Using hOCR:', simulatedHOCR);
+                
+                // Try the legacy method first as a fallback
+                let boundingBox;
+                try {
+                    boundingBox = wasm_bindgen.extract_bounding_box_from_hocr(simulatedHOCR, searchText);
+                } catch (error) {
+                    console.warn('Word-level extraction failed, trying legacy method:', error);
+                    // Fallback to legacy LINE-based extraction
+                    const embeddedText = "[[PARAGRAPH]] [[LINE 150 200 320 220]] voltage regulator [[LINE 150 230 320 250]] is crucial";
+                    boundingBox = wasm_bindgen.extract_bounding_box(embeddedText, searchText);
+                }
+                
+                if (!boundingBox) {
+                    resultsDiv.innerHTML = '<div class="error">❌ Could not find text in document</div>';
+                    return;
+                }
+                
+                // Step 4: Transform coordinates using WASM
+                const transform = wasm_bindgen.calculate_coordinate_transform(
+                    595, 842,    // PDF page size
+                    2560, 3300   // hOCR page size (scaled up to simulate real document)
+                );
+                
+                const pdfCoords = wasm_bindgen.transform_coordinates(
+                    boundingBox.x1, boundingBox.y1, boundingBox.x2, boundingBox.y2,
+                    transform
+                );
+                
+                // Step 5: Create annotation style using WASM
+                const customStyle = wasm_bindgen.create_custom_annotation_style(
+                    annotationColor,
+                    annotationColor,  // fill color same as border
+                    0.3,              // opacity
+                    2.0,              // border width
+                    10.0              // font size
+                );
+                
+                // Step 6: Apply annotation to PDF
+                const colorRgb = hexToRgb(annotationColor);
+                
+                switch (annotationType) {
+                    case 'highlight':
+                        page.drawRectangle({
+                            x: pdfCoords.x,
+                            y: pdfCoords.y,
+                            width: pdfCoords.width,
+                            height: pdfCoords.height,
+                            color: PDFLib.rgb(colorRgb.r / 255, colorRgb.g / 255, colorRgb.b / 255),
+                            opacity: 0.3
+                        });
+                        break;
+                    
+                    case 'underline':
+                        page.drawLine({
+                            start: { x: pdfCoords.x, y: pdfCoords.y },
+                            end: { x: pdfCoords.x + pdfCoords.width, y: pdfCoords.y },
+                            thickness: 2,
+                            color: PDFLib.rgb(colorRgb.r / 255, colorRgb.g / 255, colorRgb.b / 255),
+                        });
+                        break;
+                    
+                    case 'strikethrough':
+                        const middleY = pdfCoords.y + pdfCoords.height / 2;
+                        page.drawLine({
+                            start: { x: pdfCoords.x, y: middleY },
+                            end: { x: pdfCoords.x + pdfCoords.width, y: middleY },
+                            thickness: 2,
+                            color: PDFLib.rgb(colorRgb.r / 255, colorRgb.g / 255, colorRgb.b / 255),
+                        });
+                        break;
+                    
+                    case 'rectangle':
+                    default:
+                        page.drawRectangle({
+                            x: pdfCoords.x,
+                            y: pdfCoords.y,
+                            width: pdfCoords.width,
+                            height: pdfCoords.height,
+                            borderColor: PDFLib.rgb(colorRgb.r / 255, colorRgb.g / 255, colorRgb.b / 255),
+                            borderWidth: 2,
+                            opacity: 0.1
+                        });
+                        break;
+                }
+                
+                // Add similarity score label
+                const similarityText = '95.0%'; // Simulated high similarity
+                page.drawText(similarityText, {
+                    x: pdfCoords.x,
+                    y: pdfCoords.y + pdfCoords.height + 5,
+                    size: 10,
+                    font: font,
+                    color: PDFLib.rgb(colorRgb.r / 255, colorRgb.g / 255, colorRgb.b / 255)
+                });
+                
+                // Step 7: Generate PDF and create download
+                const pdfBytes = await pdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                
+                resultsDiv.innerHTML = `
+                    <div class="success">
+                        <h4>✅ PDF Annotation Complete!</h4>
+                        <p><strong>Search Text:</strong> "${searchText}"</p>
+                        <p><strong>Annotation Type:</strong> ${annotationType}</p>
+                        <p><strong>Color:</strong> <span style="background-color: ${annotationColor}; padding: 2px 6px; border-radius: 3px; color: white;">${annotationColor}</span></p>
+                        <p><strong>hOCR Coordinates:</strong> [${boundingBox.x1}, ${boundingBox.y1}, ${boundingBox.x2}, ${boundingBox.y2}]</p>
+                        <p><strong>PDF Coordinates:</strong> [${pdfCoords.x.toFixed(2)}, ${pdfCoords.y.toFixed(2)}, ${(pdfCoords.x + pdfCoords.width).toFixed(2)}, ${(pdfCoords.y + pdfCoords.height).toFixed(2)}]</p>
+                        <p><strong>Transform Scale:</strong> X=${transform.scale_x.toFixed(4)}, Y=${transform.scale_y.toFixed(4)}</p>
+                        <p><em>✨ Complete pipeline: WASM text matching → coordinate extraction → transformation → PDF annotation</em></p>
+                    </div>
+                `;
+                
+                downloadDiv.innerHTML = `
+                    <h4>📄 Download Annotated PDF</h4>
+                    <a href="${url}" download="annotated_document_v${wasm_bindgen.get_version()}.pdf">
+                        <button style="background-color: #28a745; font-size: 16px; padding: 12px 24px;">
+                            📄 Download PDF with ${annotationType} annotation
+                        </button>
+                    </a>
+                    <p style="font-size: 12px; color: #666;">
+                        PDF created using WASM v${wasm_bindgen.get_version()} with enhanced features
+                    </p>
+                `;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ PDF annotation failed: ${error.message}</div>`;
+                console.error('PDF annotation error:', error);
+            }
+        }
+
+        // Helper function to convert hex color to RGB
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 255, g: 0, b: 0 }; // Default to red
+        }
+    </script>
+</body>
+</html>

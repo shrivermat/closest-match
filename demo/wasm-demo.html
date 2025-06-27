@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Document Annotator Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .version-info {
+            background-color: #e7f3ff;
+            border: 1px solid #0066cc;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .loading {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .match-result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .feature-test {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .feature-status {
+            font-weight: bold;
+        }
+        .feature-passed { color: #28a745; }
+        .feature-failed { color: #dc3545; }
+        .feature-pending { color: #ffc107; }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 WASM Document Annotator Demo</h1>
+    <p>This demo uses the actual WASM module with enhanced features!</p>
+    
+    <div class="version-info" id="versionInfo">
+        <h3>📦 Loading WASM Module...</h3>
+        <div id="versionDetails">Initializing...</div>
+    </div>
+
+    <div class="panel">
+        <h2>🧪 System Tests</h2>
+        <button id="initSystem">Initialize System</button>
+        <button id="testFeatures" disabled>Test All Features</button>
+        <button id="testVersioning">Check Version</button>
+        
+        <div id="systemStatus"></div>
+        <div id="featureResults"></div>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2>📝 Text Matching Test</h2>
+            <div class="form-group">
+                <label for="testText">Embedded Text (with hOCR markers):</label>
+                <textarea id="testText" rows="4">[[PARAGRAPH]] [[LINE 100 200 500 250]] voltage regulator circuit [[LINE 100 260 480 310]] provides stable power output</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="searchText">Search Text:</label>
+                <input type="text" id="searchText" value="voltage regulator" placeholder="Enter text to search for">
+            </div>
+            
+            <button id="testTextMatching">Test Text Matching</button>
+            <button id="testFuzzyMatching">Test Fuzzy Matching</button>
+            
+            <div id="textResults"></div>
+        </div>
+
+        <div class="panel">
+            <h2>📍 Coordinate Extraction Test</h2>
+            <div class="form-group">
+                <label for="hocrContent">hOCR Content:</label>
+                <textarea id="hocrContent" rows="6"><p class='ocr_par'>
+<span class='ocr_line' title='bbox 100 200 500 250'>
+<span class='ocrx_word' title='bbox 100 200 180 230'>voltage</span>
+<span class='ocrx_word' title='bbox 190 200 280 230'>regulator</span>
+<span class='ocrx_word' title='bbox 290 200 360 230'>circuit</span>
+</span>
+</p></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="searchQuery">Search Query:</label>
+                <input type="text" id="searchQuery" value="voltage regulator" placeholder="Text to find coordinates for">
+            </div>
+            
+            <button id="testWordLevelExtraction">Test Word-Level Extraction</button>
+            <button id="testLegacyExtraction">Test Legacy Extraction</button>
+            
+            <div id="coordinateResults"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2>🎨 Annotation Styles Test</h2>
+            <div class="form-group">
+                <label for="annotationType">Annotation Type:</label>
+                <select id="annotationType">
+                    <option value="rectangle">Rectangle</option>
+                    <option value="highlight">Highlight</option>
+                    <option value="underline">Underline</option>
+                    <option value="strikethrough">Strikethrough</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="borderColor">Border Color:</label>
+                <input type="color" id="borderColor" value="#ff0000">
+            </div>
+            
+            <div class="form-group">
+                <label for="fillColor">Fill Color:</label>
+                <input type="color" id="fillColor" value="#ffff00">
+            </div>
+            
+            <button id="testAnnotationStyles">Test Annotation Styles</button>
+            <button id="testCoordinateTransform">Test Coordinate Transform</button>
+            
+            <div id="annotationResults"></div>
+        </div>
+
+        <div class="panel">
+            <h2>📊 Performance Test</h2>
+            <div class="form-group">
+                <label for="testIterations">Number of iterations:</label>
+                <input type="number" id="testIterations" value="100" min="1" max="1000">
+            </div>
+            
+            <button id="runPerformanceTest">Run Performance Test</button>
+            
+            <div id="performanceResults"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import the actual WASM module
+        import init, { 
+            log_version_info, 
+            get_version, 
+            get_package_name, 
+            get_version_info,
+            find_closest_match,
+            extract_bounding_box,
+            extract_bounding_box_from_hocr,
+            calculate_coordinate_transform,
+            transform_coordinates,
+            AnnotationStyle,
+            create_custom_annotation_style,
+            parse_color
+        } from '../pkg/document_annotator.js';
+
+        let wasmInitialized = false;
+        let wasmFunctions = {};
+
+        // Initialize system function
+        async function initializeSystem() {
+            const statusDiv = document.getElementById('systemStatus');
+            const versionDiv = document.getElementById('versionInfo');
+            
+            try {
+                statusDiv.innerHTML = '<div class="loading">🔄 Initializing WASM module...</div>';
+                
+                // Initialize WASM
+                await init();
+                
+                // Store functions globally
+                wasmFunctions = {
+                    log_version_info, 
+                    get_version, 
+                    get_package_name, 
+                    get_version_info,
+                    find_closest_match,
+                    extract_bounding_box,
+                    extract_bounding_box_from_hocr,
+                    calculate_coordinate_transform,
+                    transform_coordinates,
+                    AnnotationStyle,
+                    create_custom_annotation_style,
+                    parse_color
+                };
+                
+                wasmInitialized = true;
+                
+                // Log version info to console
+                log_version_info();
+                
+                // Get version info for display
+                const versionInfo = get_version_info();
+                
+                versionDiv.innerHTML = `
+                    <h3>✅ WASM Module Loaded Successfully!</h3>
+                    <p><strong>Package:</strong> ${versionInfo.packageName}</p>
+                    <p><strong>Version:</strong> ${versionInfo.version}</p>
+                    <p><strong>Loaded at:</strong> ${versionInfo.loadedAt}</p>
+                    <p><strong>Features:</strong> ${versionInfo.features.join(', ')}</p>
+                `;
+                
+                statusDiv.innerHTML = '<div class="success">✅ System initialized successfully! All features are now available.</div>';
+                
+                // Enable feature tests button
+                document.getElementById('testFeatures').disabled = false;
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Initialization failed: ${error.message}</div>`;
+                versionDiv.innerHTML = '<h3>❌ WASM Module Failed to Load</h3>';
+                console.error('WASM initialization error:', error);
+            }
+        }
+
+        function testVersioning() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('systemStatus');
+            const version = wasmFunctions.get_version();
+            const packageName = wasmFunctions.get_package_name();
+            const versionInfo = wasmFunctions.get_version_info();
+            
+            // Log to console
+            wasmFunctions.log_version_info();
+            
+            statusDiv.innerHTML = `
+                <div class="success">
+                    <h4>📋 Version Information</h4>
+                    <p><strong>Package:</strong> ${packageName}</p>
+                    <p><strong>Version:</strong> ${version}</p>
+                    <p><strong>Features:</strong> ${versionInfo.features.join(', ')}</p>
+                    <p><em>Check browser console for detailed logs</em></p>
+                </div>
+            `;
+        }
+
+        async function runFeatureTests() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('featureResults');
+            resultsDiv.innerHTML = '<div class="loading">🧪 Running comprehensive feature tests...</div>';
+            
+            const tests = [
+                { name: 'Text Matching', test: () => testBasicTextMatching() },
+                { name: 'Word-Level Extraction', test: () => testBasicWordExtraction() },
+                { name: 'Coordinate Transform', test: () => testBasicCoordinateTransform() },
+                { name: 'Annotation Styles', test: () => testBasicAnnotationStyles() },
+                { name: 'Color Parsing', test: () => testColorParsing() }
+            ];
+            
+            let results = '<h4>🧪 Feature Test Results:</h4>';
+            
+            for (const test of tests) {
+                try {
+                    const result = await test.test();
+                    results += `
+                        <div class="feature-test">
+                            <span>${test.name}</span>
+                            <span class="feature-status feature-passed">✅ PASSED</span>
+                        </div>
+                    `;
+                } catch (error) {
+                    results += `
+                        <div class="feature-test">
+                            <span>${test.name}</span>
+                            <span class="feature-status feature-failed">❌ FAILED: ${error.message}</span>
+                        </div>
+                    `;
+                }
+            }
+            
+            resultsDiv.innerHTML = `<div class="success">${results}</div>`;
+        }
+
+        // Individual test functions
+        function testBasicTextMatching() {
+            const result = wasmFunctions.find_closest_match(
+                "[[PARAGRAPH]] [[LINE 100 200 500 250]] voltage regulator circuit",
+                "voltage regulator"
+            );
+            if (!result || result.similarity < 0.8) {
+                throw new Error('Text matching failed');
+            }
+            return result;
+        }
+
+        function testBasicWordExtraction() {
+            const hocr = `<p class='ocr_par'><span class='ocr_line' title='bbox 100 200 500 250'><span class='ocrx_word' title='bbox 100 200 180 230'>voltage</span></span></p>`;
+            const result = wasmFunctions.extract_bounding_box_from_hocr(hocr, "voltage");
+            if (!result) {
+                throw new Error('Word extraction failed');
+            }
+            return result;
+        }
+
+        function testBasicCoordinateTransform() {
+            const transform = wasmFunctions.calculate_coordinate_transform(595, 842, 2560, 3300);
+            const coords = wasmFunctions.transform_coordinates(100, 200, 300, 400, transform);
+            if (!coords || coords.width <= 0) {
+                throw new Error('Coordinate transformation failed');
+            }
+            return coords;
+        }
+
+        function testBasicAnnotationStyles() {
+            const style = wasmFunctions.AnnotationStyle.rectangle_style();
+            if (!style || style.border_color_r !== 1.0) {
+                throw new Error('Annotation style creation failed');
+            }
+            return style;
+        }
+
+        function testColorParsing() {
+            const color = wasmFunctions.parse_color("#ff0000");
+            if (!color || color[0] !== 1.0) {
+                throw new Error('Color parsing failed');
+            }
+            return color;
+        }
+
+        // Test functions that update UI
+        function testTextMatching() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const testText = document.getElementById('testText').value;
+            const searchText = document.getElementById('searchText').value;
+            const resultsDiv = document.getElementById('textResults');
+            
+            try {
+                const result = wasmFunctions.find_closest_match(testText, searchText);
+                
+                if (result) {
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ Match Found!</h4>
+                            <p><strong>Text:</strong> "${result.text}"</p>
+                            <p><strong>Similarity:</strong> ${(result.similarity * 100).toFixed(2)}%</p>
+                            <p><strong>Position:</strong> Words ${result.start_index}-${result.end_index}</p>
+                            <p><strong>Debug Info:</strong> ${result.debug_cleaned_word_count} words processed</p>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">❌ No match found</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        function testFuzzyMatching() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            // Test with intentionally misspelled text
+            const testText = "[[PARAGRAPH]] [[LINE 100 200 500 250]] voltag regulatr circit provides stable power";
+            const searchText = "voltage regulator circuit";
+            const resultsDiv = document.getElementById('textResults');
+            
+            try {
+                const result = wasmFunctions.find_closest_match(testText, searchText);
+                
+                if (result) {
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ Fuzzy Match Found!</h4>
+                            <p><strong>Text:</strong> "${result.text}"</p>
+                            <p><strong>Similarity:</strong> ${(result.similarity * 100).toFixed(2)}%</p>
+                            <p><strong>Test:</strong> Found match despite typos in source text</p>
+                            <p><em>This demonstrates the enhanced fuzzy matching capabilities!</em></p>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">❌ Fuzzy matching failed</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        function testWordLevelExtraction() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const hocrContent = document.getElementById('hocrContent').value;
+            const searchQuery = document.getElementById('searchQuery').value;
+            const resultsDiv = document.getElementById('coordinateResults');
+            
+            try {
+                const result = wasmFunctions.extract_bounding_box_from_hocr(hocrContent, searchQuery);
+                
+                if (result) {
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ Word-Level Coordinates Extracted!</h4>
+                            <p><strong>Bounding Box:</strong> [${result.x1}, ${result.y1}, ${result.x2}, ${result.y2}]</p>
+                            <p><strong>Width:</strong> ${result.x2 - result.x1}px</p>
+                            <p><strong>Height:</strong> ${result.y2 - result.y1}px</p>
+                            <p><em>This uses the enhanced word-level extraction algorithm!</em></p>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">❌ No coordinates found</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        function testLegacyExtraction() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const embeddedText = "[[PARAGRAPH]] [[LINE 100 200 500 250]] voltage regulator circuit";
+            const searchQuery = document.getElementById('searchQuery').value;
+            const resultsDiv = document.getElementById('coordinateResults');
+            
+            try {
+                const result = wasmFunctions.extract_bounding_box(embeddedText, searchQuery);
+                
+                if (result) {
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ Legacy Coordinates Extracted!</h4>
+                            <p><strong>Bounding Box:</strong> [${result.x1}, ${result.y1}, ${result.x2}, ${result.y2}]</p>
+                            <p><strong>Method:</strong> LINE marker-based extraction</p>
+                            <p><em>Compare with word-level extraction for accuracy differences</em></p>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">❌ No coordinates found with legacy method</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        function testAnnotationStyles() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const annotationType = document.getElementById('annotationType').value;
+            const borderColor = document.getElementById('borderColor').value;
+            const fillColor = document.getElementById('fillColor').value;
+            const resultsDiv = document.getElementById('annotationResults');
+            
+            try {
+                // Test built-in styles
+                let builtInStyle;
+                switch (annotationType) {
+                    case 'highlight':
+                        builtInStyle = wasmFunctions.AnnotationStyle.highlight_style();
+                        break;
+                    case 'underline':
+                        builtInStyle = wasmFunctions.AnnotationStyle.underline_style();
+                        break;
+                    case 'strikethrough':
+                        builtInStyle = wasmFunctions.AnnotationStyle.strikethrough_style();
+                        break;
+                    default:
+                        builtInStyle = wasmFunctions.AnnotationStyle.rectangle_style();
+                }
+                
+                // Test custom style creation
+                const customStyle = wasmFunctions.create_custom_annotation_style(
+                    borderColor,
+                    fillColor,
+                    0.3,  // opacity
+                    2.0,  // border width
+                    12.0  // font size
+                );
+                
+                resultsDiv.innerHTML = `
+                    <div class="success">
+                        <h4>✅ Annotation Styles Created!</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div>
+                                <h5>Built-in ${annotationType} Style:</h5>
+                                <div style="background-color: rgb(${builtInStyle.fill_color_r * 255}, ${builtInStyle.fill_color_g * 255}, ${builtInStyle.fill_color_b * 255}); border: ${builtInStyle.border_width}px solid rgb(${builtInStyle.border_color_r * 255}, ${builtInStyle.border_color_g * 255}, ${builtInStyle.border_color_b * 255}); opacity: ${builtInStyle.opacity}; padding: 10px; border-radius: 4px;">
+                                    Sample ${annotationType} annotation
+                                </div>
+                            </div>
+                            ${customStyle ? `
+                            <div>
+                                <h5>Custom Style:</h5>
+                                <div style="background-color: rgb(${customStyle.fill_color_r * 255}, ${customStyle.fill_color_g * 255}, ${customStyle.fill_color_b * 255}); border: ${customStyle.border_width}px solid rgb(${customStyle.border_color_r * 255}, ${customStyle.border_color_g * 255}, ${customStyle.border_color_b * 255}); opacity: ${customStyle.opacity}; padding: 10px; border-radius: 4px;">
+                                    Custom colored annotation
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        function testCoordinateTransform() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('annotationResults');
+            
+            try {
+                // Test coordinate transformation
+                const transform = wasmFunctions.calculate_coordinate_transform(
+                    595, 842,    // PDF page size (A4)
+                    2560, 3300   // hOCR page size
+                );
+                
+                const coords = wasmFunctions.transform_coordinates(
+                    100, 200, 300, 400, // hOCR coordinates
+                    transform
+                );
+                
+                resultsDiv.innerHTML = `
+                    <div class="success">
+                        <h4>✅ Coordinate Transformation Test!</h4>
+                        <p><strong>Transform Scale:</strong> X: ${transform.scale_x.toFixed(4)}, Y: ${transform.scale_y.toFixed(4)}</p>
+                        <p><strong>Original hOCR:</strong> [100, 200, 300, 400]</p>
+                        <p><strong>Transformed PDF:</strong> [${coords.x.toFixed(2)}, ${coords.y.toFixed(2)}, ${(coords.x + coords.width).toFixed(2)}, ${(coords.y + coords.height).toFixed(2)}]</p>
+                        <p><strong>Size:</strong> ${coords.width.toFixed(2)} × ${coords.height.toFixed(2)}</p>
+                        <p><em>Coordinates are properly scaled and Y-axis flipped for PDF space</em></p>
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function runPerformanceTest() {
+            if (!wasmInitialized) {
+                alert('Please initialize the system first');
+                return;
+            }
+            
+            const iterations = parseInt(document.getElementById('testIterations').value);
+            const resultsDiv = document.getElementById('performanceResults');
+            
+            resultsDiv.innerHTML = '<div class="loading">🏃‍♂️ Running performance test...</div>';
+            
+            try {
+                const testText = "[[PARAGRAPH]] [[LINE 100 200 500 250]] voltage regulator circuit provides stable power output";
+                const searchText = "voltage regulator";
+                
+                const startTime = performance.now();
+                
+                for (let i = 0; i < iterations; i++) {
+                    wasmFunctions.find_closest_match(testText, searchText);
+                }
+                
+                const endTime = performance.now();
+                const totalTime = endTime - startTime;
+                const avgTime = totalTime / iterations;
+                
+                resultsDiv.innerHTML = `
+                    <div class="success">
+                        <h4>⚡ Performance Results</h4>
+                        <p><strong>Iterations:</strong> ${iterations}</p>
+                        <p><strong>Total Time:</strong> ${totalTime.toFixed(2)}ms</p>
+                        <p><strong>Average Time:</strong> ${avgTime.toFixed(3)}ms per operation</p>
+                        <p><strong>Throughput:</strong> ${(1000 / avgTime).toFixed(0)} operations/second</p>
+                        <p><em>WASM performance with enhanced fuzzy matching algorithms</em></p>
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Performance test failed: ${error.message}</div>`;
+            }
+        }
+
+        // Add event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('initSystem').addEventListener('click', initializeSystem);
+            document.getElementById('testFeatures').addEventListener('click', runFeatureTests);
+            document.getElementById('testVersioning').addEventListener('click', testVersioning);
+            document.getElementById('testTextMatching').addEventListener('click', testTextMatching);
+            document.getElementById('testFuzzyMatching').addEventListener('click', testFuzzyMatching);
+            document.getElementById('testWordLevelExtraction').addEventListener('click', testWordLevelExtraction);
+            document.getElementById('testLegacyExtraction').addEventListener('click', testLegacyExtraction);
+            document.getElementById('testAnnotationStyles').addEventListener('click', testAnnotationStyles);
+            document.getElementById('testCoordinateTransform').addEventListener('click', testCoordinateTransform);
+            document.getElementById('runPerformanceTest').addEventListener('click', runPerformanceTest);
+        });
+    </script>
+</body>
+</html>

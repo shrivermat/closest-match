@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 Real WASM Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Real WASM Debug Test</h1>
+    <p>This will show exactly what's happening in our WASM coordinate extraction.</p>
+    
+    <button onclick="testRealWasm()">🧪 Test Real WASM Extraction</button>
+    <div id="results"></div>
+
+    <script src="./pkg-nomodules/document_annotator.js"></script>
+    
+    <script>
+        async function testRealWasm() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>🔄 Testing WASM...</p>';
+            
+            try {
+                console.log('🚀 Initializing WASM...');
+                await wasm_bindgen('./pkg-nomodules/document_annotator_bg.wasm');
+                
+                console.log('✅ WASM initialized, version:', wasm_bindgen.get_version());
+                
+                // Test the exact scenario from our demo
+                const searchQuery = "voltage regulator";
+                const words = searchQuery.split(' ');
+                
+                // Build hOCR exactly like in demo
+                let currentX = 150;
+                const y1 = 250;
+                const y2 = y1 + 30;
+                
+                const wordSpans = words.map(word => {
+                    const x1 = currentX;
+                    const x2 = x1 + (word.length * 12);
+                    const span = `<span class='ocrx_word' title='bbox ${x1} ${y1} ${x2} ${y2}'>${word}</span>`;
+                    currentX = x2 + 15;
+                    return span;
+                });
+                
+                const hocrContent = `
+                    <p class='ocr_par'>
+                        <span class='ocr_line' title='bbox 100 ${y1} ${currentX} ${y2}'>
+                            ${wordSpans.join('')}
+                        </span>
+                    </p>
+                `;
+                
+                console.log('🔍 Testing with hOCR:', hocrContent);
+                console.log('🔍 Search query:', searchQuery);
+                
+                // Call WASM function and check console for debug output
+                console.log('📞 Calling WASM extract_bounding_box_from_hocr...');
+                const result = wasm_bindgen.extract_bounding_box_from_hocr(hocrContent, searchQuery);
+                
+                let output = '<div class="success">';
+                output += '<h3>✅ WASM Test Complete</h3>';
+                output += `<p><strong>Search Query:</strong> "${searchQuery}"</p>`;
+                output += `<p><strong>Expected Words:</strong> ${words.length} words</p>`;
+                
+                if (result) {
+                    output += `<p><strong>✅ Result:</strong> [{${result.x1}, ${result.y1}, ${result.x2}, ${result.y2}}]</p>`;
+                    output += `<p><strong>Width:</strong> ${result.x2 - result.x1}px</p>`;
+                    output += `<p><strong>Height:</strong> ${result.y2 - result.y1}px</p>`;
+                    
+                    if (result.x2 > result.x1 && result.y2 > result.y1) {
+                        output += '<p style="color: green;"><strong>✅ Valid coordinates!</strong></p>';
+                    } else {
+                        output += '<p style="color: red;"><strong>❌ Invalid coordinates!</strong></p>';
+                    }
+                } else {
+                    output += '<p style="color: red;"><strong>❌ No result returned</strong></p>';
+                }
+                
+                output += '<p><em>📝 Check browser console for detailed WASM debug logs</em></p>';
+                output += '</div>';
+                
+                output += '<div class="result">';
+                output += '<h4>🧪 Generated hOCR Structure:</h4>';
+                output += `<pre>${hocrContent}</pre>`;
+                output += '</div>';
+                
+                resultsDiv.innerHTML = output;
+                
+            } catch (error) {
+                console.error('💥 Test failed:', error);
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
