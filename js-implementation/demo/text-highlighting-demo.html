@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Line Text Highlighting Demo - JavaScript Implementation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: 'Courier New', monospace;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .download-link {
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        
+        .download-link:hover {
+            background-color: #218838;
+        }
+        
+        .example-text {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Multi-Line Text Highlighting Demo</h1>
+        <p><strong>JavaScript Implementation</strong> - Test the new multi-line text highlighting capabilities</p>
+        
+        <div class="section">
+            <h3>📄 Sample Data</h3>
+            <p>This demo uses sample data to demonstrate multi-line text highlighting. Click the buttons below to test different scenarios.</p>
+            
+            <div class="input-group">
+                <label for="searchText">Search Text:</label>
+                <input type="text" id="searchText" value="CIRCUIT AND METHOD FOR OPERATING A CIRCUIT" 
+                       placeholder="Text to search for in the document">
+            </div>
+            
+            <div class="input-group">
+                <label for="formattedText">Formatted Text with Highlights:</label>
+                <textarea id="formattedText" rows="3" placeholder="HTML text with highlight markup">
+<strong>(54) </strong><strong style="background-color: rgb(254, 255, 1);">CIRCUIT AND METHOD</strong><strong> FOR </strong><strong style="background-color: rgb(109, 217, 255);">OPERATING A CIRCUIT</strong></textarea>
+            </div>
+            
+            <div class="example-text">
+                <strong>Example Pattern:</strong><br>
+                &lt;strong style="background-color: rgb(255, 255, 0);"&gt;TEXT TO HIGHLIGHT&lt;/strong&gt;
+            </div>
+        </div>
+        
+        <div class="section">
+            <h3>🧪 Test Functions</h3>
+            
+            <button onclick="testFormattedTextParsing()" id="testParsingBtn">
+                📝 Test Formatted Text Parsing
+            </button>
+            
+            <button onclick="testWordExtraction()" id="testWordBtn">
+                🔍 Test Word Extraction
+            </button>
+            
+            <button onclick="testTextHighlighting()" id="testHighlightBtn">
+                🎨 Test Complete Highlighting Pipeline
+            </button>
+            
+            <button onclick="generateSamplePDF()" id="testPDFBtn">
+                📄 Generate Sample PDF with Highlights
+            </button>
+        </div>
+        
+        <div class="section">
+            <h3>📊 Results</h3>
+            <div id="results" class="result info">
+                Click any test button above to see results here...
+            </div>
+        </div>
+        
+        <div class="section" id="downloadSection" style="display: none;">
+            <h3>💾 Download</h3>
+            <div id="downloadArea"></div>
+        </div>
+    </div>
+
+    <!-- Load PDF-lib for PDF manipulation -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <!-- Load our modules -->
+    <script type="module">
+        import { TextHighlighter } from '../src/text-highlighter.js';
+        import { DocumentProcessor } from '../src/document-processor.js';
+        
+        // Make modules available globally for demo functions
+        window.TextHighlighter = TextHighlighter;
+        window.DocumentProcessor = DocumentProcessor;
+        
+        // Sample hOCR data for testing
+        window.sampleHOCR = `
+            <div class='ocr_page' title='bbox 0 0 2560 3300'>
+                <div class='ocr_carea' title="bbox 329 501 1212 569">
+                    <p class='ocr_par' title="bbox 329 501 1212 569">
+                        <span class='ocr_line' title="bbox 329 501 1212 535">
+                            <span class='ocrx_word' title='bbox 329 501 388 535'>(54)</span>
+                            <span class='ocrx_word' title='bbox 428 502 588 527'><strong>CIRCUIT</strong></span>
+                            <span class='ocrx_word' title='bbox 596 502 676 527'>AND</span>
+                            <span class='ocrx_word' title='bbox 688 502 856 527'><strong>METHOD</strong></span>
+                            <span class='ocrx_word' title='bbox 868 502 946 527'>FOR</span>
+                            <span class='ocrx_word' title='bbox 956 502 1178 527'><strong>OPERATING</strong></span>
+                            <span class='ocrx_word' title='bbox 1185 502 1212 527'><strong>A</strong></span>
+                        </span>
+                        <span class='ocr_line' title="bbox 428 544 588 569">
+                            <span class='ocrx_word' title='bbox 428 544 588 569'><strong>CIRCUIT</strong></span>
+                        </span>
+                    </p>
+                </div>
+            </div>
+        `;
+        
+        console.log('✅ Multi-line text highlighting demo loaded');
+        console.log('📄 Sample hOCR data prepared');
+        console.log('🎨 TextHighlighter and DocumentProcessor modules ready');
+    </script>
+    
+    <script>
+        // Global demo functions
+        async function testFormattedTextParsing() {
+            const resultsDiv = document.getElementById('results');
+            const formattedText = document.getElementById('formattedText').value;
+            
+            try {
+                resultsDiv.className = 'result info';
+                resultsDiv.textContent = '🔄 Testing formatted text parsing...';
+                
+                const highlighter = new TextHighlighter({ debugMode: true });
+                const highlights = highlighter.parseFormattedText(formattedText);
+                
+                let result = `✅ Formatted Text Parsing Results:\n\n`;
+                result += `📝 Input: ${formattedText}\n\n`;
+                result += `🎨 Found ${highlights.length} highlight sections:\n`;
+                
+                highlights.forEach((h, i) => {
+                    result += `  ${i + 1}. "${h.text}" - Color: ${h.hexColor} (rgb(${h.color.r}, ${h.color.g}, ${h.color.b}))\n`;
+                });
+                
+                if (highlights.length === 0) {
+                    result += `⚠️ No highlights found. Make sure to use the format:\n`;
+                    result += `<strong style="background-color: rgb(255, 255, 0);">TEXT</strong>`;
+                }
+                
+                resultsDiv.className = 'result success';
+                resultsDiv.textContent = result;
+                
+            } catch (error) {
+                resultsDiv.className = 'result error';
+                resultsDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function testWordExtraction() {
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                resultsDiv.className = 'result info';
+                resultsDiv.textContent = '🔄 Testing word extraction from hOCR...';
+                
+                const highlighter = new TextHighlighter({ debugMode: true });
+                const allWords = highlighter.extractAllWordsFromHocr(window.sampleHOCR);
+                
+                // Test filtering within bounding box
+                const boundingBox = [329, 501, 1212, 569]; // From sample data
+                const wordsInArea = highlighter.filterWordsWithinBoundingBox(allWords, boundingBox);
+                
+                let result = `✅ Word Extraction Results:\n\n`;
+                result += `📄 Total words in hOCR: ${allWords.length}\n`;
+                result += `📦 Words within bounding box [${boundingBox.join(', ')}]: ${wordsInArea.length}\n\n`;
+                
+                result += `🔍 Words in area:\n`;
+                wordsInArea.forEach((word, i) => {
+                    result += `  ${i + 1}. "${word.text}" at [${word.x1}, ${word.y1}, ${word.x2}, ${word.y2}]\n`;
+                });
+                
+                result += `\n📊 All words found:\n`;
+                allWords.forEach((word, i) => {
+                    result += `  ${i + 1}. "${word.text}" at [${word.x1}, ${word.y1}, ${word.x2}, ${word.y2}]\n`;
+                });
+                
+                resultsDiv.className = 'result success';
+                resultsDiv.textContent = result;
+                
+            } catch (error) {
+                resultsDiv.className = 'result error';
+                resultsDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function testTextHighlighting() {
+            const resultsDiv = document.getElementById('results');
+            const formattedText = document.getElementById('formattedText').value;
+            
+            try {
+                resultsDiv.className = 'result info';
+                resultsDiv.textContent = '🔄 Testing complete text highlighting pipeline...';
+                
+                const highlighter = new TextHighlighter({ debugMode: true });
+                
+                // Step 1: Parse formatted text
+                const highlights = highlighter.parseFormattedText(formattedText);
+                
+                // Step 2: Extract words from hOCR
+                const allWords = highlighter.extractAllWordsFromHocr(window.sampleHOCR);
+                
+                // Step 3: Filter words within area
+                const boundingBox = [329, 501, 1212, 569];
+                const wordsInArea = highlighter.filterWordsWithinBoundingBox(allWords, boundingBox);
+                
+                // Step 4: Match highlights to words
+                const highlightCoordinates = highlighter.matchHighlightTextToWords(wordsInArea, highlights);
+                
+                let result = `✅ Complete Text Highlighting Pipeline Results:\n\n`;
+                result += `📝 Parsed ${highlights.length} highlight sections\n`;
+                result += `📄 Extracted ${allWords.length} total words from hOCR\n`;
+                result += `📦 Found ${wordsInArea.length} words within target area\n`;
+                result += `🎨 Created ${highlightCoordinates.length} highlight coordinate sets\n\n`;
+                
+                highlightCoordinates.forEach((hc, i) => {
+                    result += `🎯 Highlight ${i + 1}: "${hc.text}"\n`;
+                    result += `   Color: ${hc.hexColor}\n`;
+                    result += `   Overall bbox: [${hc.boundingBox.join(', ')}]\n`;
+                    result += `   Quads: ${hc.quads.length}\n`;
+                    hc.quads.forEach((quad, qi) => {
+                        result += `     Quad ${qi + 1}: [${quad.x1}, ${quad.y1}, ${quad.x2}, ${quad.y2}] "${quad.text}"\n`;
+                    });
+                    result += `   Words matched: ${hc.words.map(w => w.text).join(' ')}\n\n`;
+                });
+                
+                resultsDiv.className = 'result success';
+                resultsDiv.textContent = result;
+                
+            } catch (error) {
+                resultsDiv.className = 'result error';
+                resultsDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function generateSamplePDF() {
+            const resultsDiv = document.getElementById('results');
+            const downloadDiv = document.getElementById('downloadArea');
+            const downloadSection = document.getElementById('downloadSection');
+            const searchText = document.getElementById('searchText').value;
+            const formattedText = document.getElementById('formattedText').value;
+            
+            try {
+                resultsDiv.className = 'result info';
+                resultsDiv.textContent = '🔄 Generating sample PDF with multi-line highlights...';
+                downloadSection.style.display = 'none';
+                
+                // Create a sample PDF with text
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const page = pdfDoc.addPage([595, 842]); // A4 size
+                const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+                
+                // Add sample text that matches our hOCR data
+                const sampleText = `This document demonstrates multi-line text highlighting.
+                
+(54) CIRCUIT AND METHOD FOR OPERATING A
+CIRCUIT
+
+The text above shows how highlights can span multiple lines.
+This is particularly useful for academic papers, patents, and 
+technical documentation where important concepts may wrap
+across line boundaries.
+
+The highlighting system supports:
+• Multiple highlight colors
+• Arbitrary number of lines
+• Professional PDF annotations
+• Precise word-level positioning`;
+                
+                page.drawText(sampleText, {
+                    x: 50,
+                    y: 750,
+                    size: 12,
+                    font: font,
+                    maxWidth: 500,
+                });
+                
+                // Save the base PDF
+                let pdfBytes = await pdfDoc.save();
+                
+                // Use DocumentProcessor to add highlights
+                const processor = new DocumentProcessor({ debugMode: true });
+                
+                const result = await processor.processDocumentWithHighlights(
+                    window.sampleHOCR,
+                    pdfBytes,
+                    searchText,
+                    formattedText,
+                    {
+                        pageNumber: 0,
+                        color: [1, 0, 0], // Red border
+                        opacity: 0.3,
+                        highlightOpacity: 0.4,
+                        hocrPageSize: { width: 2560, height: 3300 }
+                    }
+                );
+                
+                if (result.success) {
+                    // Create download link
+                    const blob = new Blob([result.annotatedPdf], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    downloadDiv.innerHTML = `
+                        <a href="${url}" download="multi-line-highlights-demo.pdf" class="download-link">
+                            📄 Download PDF with Multi-Line Highlights
+                        </a>
+                        <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                            PDF created with ${result.metadata.highlightsCreated} highlight annotations
+                        </p>
+                    `;
+                    downloadSection.style.display = 'block';
+                    
+                    let resultText = `✅ PDF Generated Successfully!\n\n`;
+                    resultText += `📊 Processing Results:\n`;
+                    resultText += `   Search text: "${result.metadata.searchText}"\n`;
+                    resultText += `   Similarity: ${(result.metadata.similarity * 100).toFixed(1)}%\n`;
+                    resultText += `   Bounding box: [${result.boundingBox.x1}, ${result.boundingBox.y1}, ${result.boundingBox.x2}, ${result.boundingBox.y2}]\n`;
+                    resultText += `   Highlights created: ${result.metadata.highlightsCreated}\n\n`;
+                    
+                    if (result.highlightCoordinates) {
+                        resultText += `🎨 Highlight Details:\n`;
+                        result.highlightCoordinates.forEach((hc, i) => {
+                            resultText += `   ${i + 1}. "${hc.text}" (${hc.quads.length} quads, color: ${hc.hexColor})\n`;
+                        });
+                    }
+                    
+                    resultsDiv.className = 'result success';
+                    resultsDiv.textContent = resultText;
+                } else {
+                    resultsDiv.className = 'result error';
+                    resultsDiv.textContent = `❌ PDF generation failed: ${result.error}`;
+                }
+                
+            } catch (error) {
+                resultsDiv.className = 'result error';
+                resultsDiv.textContent = `❌ Error: ${error.message}`;
+                console.error('PDF generation error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
