@@ -235,6 +235,141 @@ export class PDFAnnotator {
     }
     
     /**
+     * Add text highlight annotations with multi-quad support
+     * @param {Uint8Array} pdfBytes - Original PDF bytes
+     * @param {Array} highlightCoordinates - Array of highlight coordinate objects with quads
+     * @param {number} pageNumber - Page number (0-indexed)
+     * @param {Object} hocrPageSize - hOCR page dimensions for coordinate transformation
+     * @param {Object} options - Highlight options
+     * @returns {Promise<Uint8Array>} Modified PDF bytes
+     */
+    async addTextHighlights(pdfBytes, highlightCoordinates, pageNumber = 0, hocrPageSize = null, options = {}) {
+        if (!this.PDFLib) {
+            throw new Error('pdf-lib not available');
+        }
+        
+        if (!highlightCoordinates || highlightCoordinates.length === 0) {
+            this._log('No highlight coordinates provided');
+            return pdfBytes;
+        }
+        
+        // Load the PDF document
+        const pdfDoc = await this.PDFLib.PDFDocument.load(pdfBytes);
+        const pages = pdfDoc.getPages();
+        
+        if (pageNumber >= pages.length) {
+            throw new Error(`Page ${pageNumber} does not exist. PDF has ${pages.length} pages.`);
+        }
+        
+        const page = pages[pageNumber];
+        const { width: pageWidth, height: pageHeight } = page.getSize();
+        
+        this._log(`Adding ${highlightCoordinates.length} text highlight annotations to page ${pageNumber}`);
+        
+        // Create text highlight annotations for each highlight coordinate set
+        for (const highlightCoord of highlightCoordinates) {
+            this._log(`Creating multi-line highlight annotation for: "${highlightCoord.text}" with ${highlightCoord.quads.length} quads`);
+            
+            // Transform each quad to PDF space and collect QuadPoints
+            const allQuadPoints = [];
+            let overallPdfRect = null;
+            
+            for (let i = 0; i < highlightCoord.quads.length; i++) {
+                const quad = highlightCoord.quads[i];
+                this._log(`Processing quad ${i+1}: [${quad.x1}, ${quad.y1}, ${quad.x2}, ${quad.y2}] for "${quad.text}"`);
+                
+                // Transform quad coordinates to PDF space
+                const quadPdfCoords = this.transformCoordinates(
+                    { x1: quad.x1, y1: quad.y1, x2: quad.x2, y2: quad.y2 },
+                    hocrPageSize || { width: 2560, height: 3300 }, // Default hOCR size
+                    { width: pageWidth, height: pageHeight },
+                    hocrPageSize
+                );
+                
+                const pdfX1 = quadPdfCoords.x;
+                const pdfY1 = quadPdfCoords.y;
+                const pdfX2 = quadPdfCoords.x + quadPdfCoords.width;
+                const pdfY2 = quadPdfCoords.y + quadPdfCoords.height;
+                
+                // Add QuadPoints for this quad (each quad needs 8 values: x1,y2,x2,y2,x1,y1,x2,y1)
+                allQuadPoints.push(pdfX1, pdfY2, pdfX2, pdfY2, pdfX1, pdfY1, pdfX2, pdfY1);
+                
+                this._log(`Quad ${i+1} PDF coords: [${pdfX1.toFixed(2)}, ${pdfY1.toFixed(2)}, ${pdfX2.toFixed(2)}, ${pdfY2.toFixed(2)}]`);
+                
+                // Update overall bounding rectangle
+                if (overallPdfRect === null) {
+                    overallPdfRect = [pdfX1, pdfY1, pdfX2, pdfY2];
+                } else {
+                    overallPdfRect[0] = Math.min(overallPdfRect[0], pdfX1); // min x
+                    overallPdfRect[1] = Math.min(overallPdfRect[1], pdfY1); // min y
+                    overallPdfRect[2] = Math.max(overallPdfRect[2], pdfX2); // max x
+                    overallPdfRect[3] = Math.max(overallPdfRect[3], pdfY2); // max y
+                }
+            }
+            
+            this._log(`Overall PDF Rect: [${overallPdfRect.map(v => v.toFixed(2)).join(', ')}]`);
+            this._log(`QuadPoints array length: ${allQuadPoints.length} (${allQuadPoints.length/8} quads)`);
+            
+            try {
+                // Create text highlight annotation with multiple quads
+                const highlightAnnotation = pdfDoc.context.obj({
+                    Type: 'Annot',
+                    Subtype: 'Highlight',
+                    Rect: overallPdfRect, // Overall bounding rectangle
+                    QuadPoints: allQuadPoints, // Array of all quad points for multi-line highlighting
+                    C: [highlightCoord.color.r / 255, highlightCoord.color.g / 255, highlightCoord.color.b / 255],
+                    CA: options.opacity || 0.5, // Transparency
+                    F: 4, // Print flag
+                    Contents: this.PDFLib.PDFString.of(`Multi-line Highlight: ${highlightCoord.text}`),
+                    T: this.PDFLib.PDFString.of('TextHighlight'), // Title
+                    M: this.PDFLib.PDFString.of(new Date().toISOString()), // Modified date
+                    CreationDate: this.PDFLib.PDFString.of(new Date().toISOString()),
+                    P: page.ref // Reference to page
+                });
+                
+                // Register the highlight annotation
+                const annotRef = pdfDoc.context.register(highlightAnnotation);
+                
+                // Add to page annotations
+                const existingAnnots = page.node.get(this.PDFLib.PDFName.of('Annots'));
+                if (existingAnnots) {
+                    existingAnnots.push(annotRef);
+                } else {
+                    page.node.set(this.PDFLib.PDFName.of('Annots'), pdfDoc.context.obj([annotRef]));
+                }
+                
+                this._log(`✅ Created multi-line highlight annotation for "${highlightCoord.text}" with ${highlightCoord.quads.length} quads and ${highlightCoord.wordCount} words`);
+                
+            } catch (error) {
+                console.warn(`Failed to create highlight annotation for "${highlightCoord.text}":`, error);
+                
+                // Fallback: create individual highlights for each quad
+                for (const quad of highlightCoord.quads) {
+                    const quadPdfCoords = this.transformCoordinates(
+                        { x1: quad.x1, y1: quad.y1, x2: quad.x2, y2: quad.y2 },
+                        hocrPageSize || { width: 2560, height: 3300 },
+                        { width: pageWidth, height: pageHeight },
+                        hocrPageSize
+                    );
+                    
+                    // Create simple rectangle as fallback
+                    page.drawRectangle({
+                        x: quadPdfCoords.x,
+                        y: quadPdfCoords.y,
+                        width: quadPdfCoords.width,
+                        height: quadPdfCoords.height,
+                        color: this.rgb(highlightCoord.color.r / 255, highlightCoord.color.g / 255, highlightCoord.color.b / 255),
+                        opacity: options.opacity || 0.3
+                    });
+                }
+            }
+        }
+        
+        // Save and return the PDF
+        return await pdfDoc.save();
+    }
+
+    /**
      * Logging utility
      * @private
      */
