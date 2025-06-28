@@ -368,6 +368,47 @@ const annotation = pdfDoc.context.obj({
 - **TypeScript Bundle:** ~460KB (`dist/index.js`)
 - **Total Bundle Size:** ~1.5MB (within acceptable limits)
 
+### Advanced Feature: Formatted Text Highlighting
+
+**New Feature:** Added support for creating text highlight annotations within rectangle annotations based on `formattedText` property.
+
+**How it works:**
+1. **Rectangle annotation** created for the main search text
+2. **Text highlight annotations** created for specific words/phrases within the rectangle
+3. **WASM word extraction** from hOCR data for precise positioning
+4. **Multi-line support** with automatic quad merging
+
+**Usage Example:**
+```javascript
+const searchQueries = [{
+    text: "(54) CIRCUIT AND METHOD FOR OPERATING A CIRCUIT",
+    formattedText: "<strong>(54) </strong><strong style=\"background-color: rgb(254, 255, 1);\">CIRCUIT AND METHOD</strong><strong> FOR </strong><strong style=\"background-color: rgb(109, 217, 255);\">OPERATING A CIRCUIT</strong>",
+    annotationType: "rectangle",
+    formatting: {
+        color: "#ff0000",
+        backgroundColor: "#ffff00"
+    }
+}];
+```
+
+**Result:**
+- ✅ Main rectangle annotation around entire text
+- ✅ Yellow text highlight on "CIRCUIT AND METHOD"
+- ✅ Blue text highlight on "OPERATING A CIRCUIT"
+- ✅ All annotations are selectable in PDF viewers
+
+**Technical Implementation:**
+1. **Parse formatted text:** Extract `background-color` styles from HTML
+2. **Extract word coordinates:** Use WASM to get word-level bounding boxes from hOCR
+3. **Create highlight quads:** Group words by line, merge adjacent highlights
+4. **Transform coordinates:** Use WASM coordinate transformation for accurate positioning
+5. **Generate annotations:** Create PDF `Highlight` annotation objects
+
+**Available in Interactive Code Playground:**
+- Select "Formatted Text Highlighting" example
+- Shows complete implementation with logging
+- Demonstrates both rectangle and text highlight creation
+
 ### Next Steps
 1. ✅ Verify correct WASM file in `dist/document_annotator_bg.wasm`
 2. ✅ Check Network tab shows successful WASM load
@@ -377,3 +418,5 @@ const annotation = pdfDoc.context.obj({
 6. ✅ Verify Interactive Code Playground fully functional
 7. ✅ Document TypeScript compilation requirements
 8. ✅ Document PDF annotation best practices
+9. ✅ Implement formatted text highlighting feature
+10. ✅ Add Interactive Code Playground example for formatted text
