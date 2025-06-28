@@ -5,14 +5,17 @@
   "main": "src/document-processor.js",
   "type": "module",
   "scripts": {
-    "dev": "python3 -m http.server 8080",
+    "dev": "http-server -p 8080 -c-1 --cors",
+    "dev-python": "python3 -m http.server 8080",
+    "dev-node": "node -e \"const http = require('http'); const fs = require('fs'); const path = require('path'); const server = http.createServer((req, res) => { const filePath = path.join(__dirname, req.url === '/' ? '/demo/index.html' : req.url); const extname = path.extname(filePath); const contentType = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }[extname] || 'text/plain'; fs.readFile(filePath, (err, content) => { if (err) { res.writeHead(404); res.end('Not found'); } else { res.writeHead(200, { 'Content-Type': contentType }); res.end(content); } }); }); server.listen(8080, () => console.log('Server running at http://localhost:8080'));\"",
     "test": "node tests/run-tests.js"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
-    "jsdom": "^23.0.0"
+    "jsdom": "^23.0.0",
+    "http-server": "^14.1.1"
   },
   "keywords": [
     "pdf",
