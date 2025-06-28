@@ -268,10 +268,19 @@
             
             try {
                 resultsDiv.className = 'result info';
-                resultsDiv.textContent = '🔄 Testing word extraction from hOCR...';
+                resultsDiv.textContent = '🔄 Loading real hOCR file for word extraction...';
+                
+                // Load real hOCR data
+                const hocrResponse = await fetch('./document.hocr');
+                if (!hocrResponse.ok) {
+                    throw new Error(`Failed to load hOCR: ${hocrResponse.status}`);
+                }
+                const realHocrContent = await hocrResponse.text();
+                
+                resultsDiv.textContent = '🔄 Testing word extraction from real hOCR...';
                 
                 const highlighter = new TextHighlighter({ debugMode: true });
-                const allWords = highlighter.extractAllWordsFromHocr(window.sampleHOCR);
+                const allWords = highlighter.extractAllWordsFromHocr(realHocrContent);
                 
                 // Test filtering within bounding box
                 const boundingBox = [329, 501, 1212, 569]; // From sample data
@@ -306,6 +315,15 @@
             
             try {
                 resultsDiv.className = 'result info';
+                resultsDiv.textContent = '🔄 Loading real hOCR for highlighting pipeline test...';
+                
+                // Load real hOCR data
+                const hocrResponse = await fetch('./document.hocr');
+                if (!hocrResponse.ok) {
+                    throw new Error(`Failed to load hOCR: ${hocrResponse.status}`);
+                }
+                const realHocrContent = await hocrResponse.text();
+                
                 resultsDiv.textContent = '🔄 Testing complete text highlighting pipeline...';
                 
                 const highlighter = new TextHighlighter({ debugMode: true });
@@ -313,8 +331,8 @@
                 // Step 1: Parse formatted text
                 const highlights = highlighter.parseFormattedText(formattedText);
                 
-                // Step 2: Extract words from hOCR
-                const allWords = highlighter.extractAllWordsFromHocr(window.sampleHOCR);
+                // Step 2: Extract words from real hOCR
+                const allWords = highlighter.extractAllWordsFromHocr(realHocrContent);
                 
                 // Step 3: Filter words within area
                 const boundingBox = [329, 501, 1212, 569];
@@ -358,56 +376,43 @@
             
             try {
                 resultsDiv.className = 'result info';
-                resultsDiv.textContent = '🔄 Generating sample PDF with multi-line highlights...';
+                resultsDiv.textContent = '🔄 Loading real PDF and hOCR files...';
                 downloadSection.style.display = 'none';
                 
-                // Create a sample PDF with text
-                const pdfDoc = await PDFLib.PDFDocument.create();
-                const page = pdfDoc.addPage([595, 842]); // A4 size
-                const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+                // Load the real PDF and hOCR files from the demo folder
+                resultsDiv.textContent = '🔄 Fetching document.pdf and document.hocr...';
                 
-                // Add sample text that matches our hOCR data
-                const sampleText = `This document demonstrates multi-line text highlighting.
+                const [pdfResponse, hocrResponse] = await Promise.all([
+                    fetch('./document.pdf'),
+                    fetch('./document.hocr')
+                ]);
                 
-(54) CIRCUIT AND METHOD FOR OPERATING A
-CIRCUIT
-
-The text above shows how highlights can span multiple lines.
-This is particularly useful for academic papers, patents, and 
-technical documentation where important concepts may wrap
-across line boundaries.
-
-The highlighting system supports:
-• Multiple highlight colors
-• Arbitrary number of lines
-• Professional PDF annotations
-• Precise word-level positioning`;
+                if (!pdfResponse.ok) {
+                    throw new Error(`Failed to load PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
+                }
+                if (!hocrResponse.ok) {
+                    throw new Error(`Failed to load hOCR: ${hocrResponse.status} ${hocrResponse.statusText}`);
+                }
                 
-                page.drawText(sampleText, {
-                    x: 50,
-                    y: 750,
-                    size: 12,
-                    font: font,
-                    maxWidth: 500,
-                });
+                const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+                const hocrContent = await hocrResponse.text();
                 
-                // Save the base PDF
-                let pdfBytes = await pdfDoc.save();
+                resultsDiv.textContent = '🔄 Processing real document with multi-line highlights...';
                 
-                // Use DocumentProcessor to add highlights
+                // Use DocumentProcessor to add highlights to the REAL PDF
                 const processor = new DocumentProcessor({ debugMode: true });
                 
                 const result = await processor.processDocumentWithHighlights(
-                    window.sampleHOCR,
-                    pdfBytes,
+                    hocrContent,  // Real hOCR data
+                    pdfBytes,     // Real PDF data
                     searchText,
                     formattedText,
                     {
                         pageNumber: 0,
                         color: [1, 0, 0], // Red border
                         opacity: 0.3,
-                        highlightOpacity: 0.4,
-                        hocrPageSize: { width: 2560, height: 3300 }
+                        highlightOpacity: 0.4
+                        // Let the processor auto-detect hOCR page size
                     }
                 );
                 

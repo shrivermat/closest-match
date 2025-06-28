@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Server Test</title>
+</head>
+<body>
+    <h1>Server Test Page</h1>
+    <p>If you can see this page, the server is working.</p>
+    
+    <div id="test-results">
+        <h2>Module Loading Test:</h2>
+        <div id="module-status">Testing...</div>
+    </div>
+    
+    <script type="module">
+        try {
+            // Test if we can load the modules
+            const textHighlighterResponse = await fetch('./src/text-highlighter.js');
+            const docProcessorResponse = await fetch('./src/document-processor.js');
+            
+            const statusDiv = document.getElementById('module-status');
+            
+            if (textHighlighterResponse.ok && docProcessorResponse.ok) {
+                statusDiv.innerHTML = `
+                    <div style="color: green;">
+                        ✅ All modules accessible:<br>
+                        • text-highlighter.js: ${textHighlighterResponse.status}<br>
+                        • document-processor.js: ${docProcessorResponse.status}<br>
+                        <br>
+                        <strong>Server is working correctly!</strong><br>
+                        <a href="demo/text-highlighting-demo.html">Go to Text Highlighting Demo</a>
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = `
+                    <div style="color: red;">
+                        ❌ Module loading failed:<br>
+                        • text-highlighter.js: ${textHighlighterResponse.status}<br>
+                        • document-processor.js: ${docProcessorResponse.status}<br>
+                        <br>
+                        Make sure you're running the server from the js-implementation directory.
+                    </div>
+                `;
+            }
+        } catch (error) {
+            document.getElementById('module-status').innerHTML = `
+                <div style="color: red;">
+                    ❌ Error testing modules: ${error.message}
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
