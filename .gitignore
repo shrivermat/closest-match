@@ -1,5 +1,6 @@
 # Build outputs
-/dist/
+/dist/*
+!/dist/index.html
 /target/
 /pkg/
 
