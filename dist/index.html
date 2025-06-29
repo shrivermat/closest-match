@@ -616,19 +616,40 @@
                     return [];
                 }
                 
+                console.log('🎨 Parsing formatted text:', formattedText);
+                
+                // First, normalize escaped quotes to regular quotes
+                const normalizedText = formattedText.replace(/\\"/g, '"');
+                console.log('🔧 Normalized text:', normalizedText);
+                
                 const highlights = [];
-                const regex = /<strong[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>([^<]+)<\/strong>/g;
+                // Enhanced regex to handle any HTML tag with background-color styling
+                // Matches <tag style="...background-color: rgb(r,g,b)...">content</tag>
+                // Uses dotall flag to match across newlines and handles any content within tags
+                const regex = /<(\w+)[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>(.*?)<\/\1>/gs;
                 let match;
                 
-                while ((match = regex.exec(formattedText)) !== null) {
-                    const [, rgbValues, text] = match;
+                // Reset regex lastIndex to ensure we start from the beginning
+                regex.lastIndex = 0;
+                
+                while ((match = regex.exec(normalizedText)) !== null) {
+                    const [fullMatch, tagName, rgbValues, text] = match;
+                    console.log(`🎯 Found highlight match: tag="${tagName}", rgb="${rgbValues}", text="${text}"`);
+                    
                     const [r, g, b] = rgbValues.split(',').map(v => parseInt(v.trim()));
                     
-                    highlights.push({
-                        text: text.trim(),
-                        color: { r, g, b },
-                        hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-                    });
+                    // Clean up the text (remove HTML tags and normalize whitespace)
+                    const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                    
+                    if (cleanText) {
+                        highlights.push({
+                            text: cleanText,
+                            color: { r, g, b },
+                            hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+                        });
+                        
+                        console.log(`✅ Added highlight: "${cleanText}" with color rgb(${r}, ${g}, ${b}) in <${tagName}> tag`);
+                    }
                 }
                 
                 console.log('🎨 Parsed formatted text highlights:', highlights);

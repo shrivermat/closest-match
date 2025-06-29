@@ -265,6 +265,7 @@
         
         async function testWordExtraction() {
             const resultsDiv = document.getElementById('results');
+            const searchText = document.getElementById('searchText').value;
             
             try {
                 resultsDiv.className = 'result info';
@@ -277,28 +278,48 @@
                 }
                 const realHocrContent = await hocrResponse.text();
                 
-                resultsDiv.textContent = '🔄 Testing word extraction from real hOCR...';
+                resultsDiv.textContent = '🔄 Finding bounding box for search text...';
+                
+                // Use DocumentProcessor to find the actual bounding box for the search text
+                const processor = new DocumentProcessor({ debugMode: true });
+                const testResult = await processor.testTextMatching(realHocrContent, searchText);
+                
+                if (!testResult.valid) {
+                    throw new Error(`Could not find valid bounding box for search text: "${searchText}"`);
+                }
+                
+                resultsDiv.textContent = '🔄 Testing word extraction with dynamic bounding box...';
                 
                 const highlighter = new TextHighlighter({ debugMode: true });
                 const allWords = highlighter.extractAllWordsFromHocr(realHocrContent);
                 
-                // Test filtering within bounding box
-                const boundingBox = [329, 501, 1212, 569]; // From sample data
+                // Use the dynamically found bounding box
+                const boundingBox = [testResult.boundingBox.x1, testResult.boundingBox.y1, testResult.boundingBox.x2, testResult.boundingBox.y2];
                 const wordsInArea = highlighter.filterWordsWithinBoundingBox(allWords, boundingBox);
                 
                 let result = `✅ Word Extraction Results:\n\n`;
+                result += `🔍 Search text: "${searchText}"\n`;
+                result += `📦 Found bounding box: [${boundingBox.join(', ')}]\n`;
                 result += `📄 Total words in hOCR: ${allWords.length}\n`;
-                result += `📦 Words within bounding box [${boundingBox.join(', ')}]: ${wordsInArea.length}\n\n`;
+                result += `📦 Words within bounding box: ${wordsInArea.length}\n\n`;
                 
-                result += `🔍 Words in area:\n`;
+                result += `🔍 Words in target area:\n`;
                 wordsInArea.forEach((word, i) => {
                     result += `  ${i + 1}. "${word.text}" at [${word.x1}, ${word.y1}, ${word.x2}, ${word.y2}]\n`;
                 });
                 
-                result += `\n📊 All words found:\n`;
-                allWords.forEach((word, i) => {
-                    result += `  ${i + 1}. "${word.text}" at [${word.x1}, ${word.y1}, ${word.x2}, ${word.y2}]\n`;
-                });
+                if (allWords.length > 50) {
+                    result += `\n📊 First 50 of ${allWords.length} total words found:\n`;
+                    allWords.slice(0, 50).forEach((word, i) => {
+                        result += `  ${i + 1}. "${word.text}" at [${word.x1}, ${word.y1}, ${word.x2}, ${word.y2}]\n`;
+                    });
+                    result += `  ... and ${allWords.length - 50} more words\n`;
+                } else {
+                    result += `\n📊 All words found:\n`;
+                    allWords.forEach((word, i) => {
+                        result += `  ${i + 1}. "${word.text}" at [${word.x1}, ${word.y1}, ${word.x2}, ${word.y2}]\n`;
+                    });
+                }
                 
                 resultsDiv.className = 'result success';
                 resultsDiv.textContent = result;
@@ -311,6 +332,7 @@
         
         async function testTextHighlighting() {
             const resultsDiv = document.getElementById('results');
+            const searchText = document.getElementById('searchText').value;
             const formattedText = document.getElementById('formattedText').value;
             
             try {
@@ -324,6 +346,16 @@
                 }
                 const realHocrContent = await hocrResponse.text();
                 
+                resultsDiv.textContent = '🔄 Finding bounding box for search text...';
+                
+                // Use DocumentProcessor to find the actual bounding box for the search text
+                const processor = new DocumentProcessor({ debugMode: true });
+                const testResult = await processor.testTextMatching(realHocrContent, searchText);
+                
+                if (!testResult.valid) {
+                    throw new Error(`Could not find valid bounding box for search text: "${searchText}"`);
+                }
+                
                 resultsDiv.textContent = '🔄 Testing complete text highlighting pipeline...';
                 
                 const highlighter = new TextHighlighter({ debugMode: true });
@@ -334,18 +366,28 @@
                 // Step 2: Extract words from real hOCR
                 const allWords = highlighter.extractAllWordsFromHocr(realHocrContent);
                 
-                // Step 3: Filter words within area
-                const boundingBox = [329, 501, 1212, 569];
+                // Step 3: Filter words within the dynamically found area
+                const boundingBox = [testResult.boundingBox.x1, testResult.boundingBox.y1, testResult.boundingBox.x2, testResult.boundingBox.y2];
                 const wordsInArea = highlighter.filterWordsWithinBoundingBox(allWords, boundingBox);
                 
                 // Step 4: Match highlights to words
                 const highlightCoordinates = highlighter.matchHighlightTextToWords(wordsInArea, highlights);
                 
                 let result = `✅ Complete Text Highlighting Pipeline Results:\n\n`;
+                result += `🔍 Search text: "${searchText}"\n`;
+                result += `📦 Found bounding box: [${boundingBox.join(', ')}]\n`;
                 result += `📝 Parsed ${highlights.length} highlight sections\n`;
                 result += `📄 Extracted ${allWords.length} total words from hOCR\n`;
                 result += `📦 Found ${wordsInArea.length} words within target area\n`;
                 result += `🎨 Created ${highlightCoordinates.length} highlight coordinate sets\n\n`;
+                
+                if (highlights.length > 0) {
+                    result += `🎨 Parsed highlights:\n`;
+                    highlights.forEach((h, i) => {
+                        result += `   ${i + 1}. "${h.text}" - Color: ${h.hexColor}\n`;
+                    });
+                    result += `\n`;
+                }
                 
                 highlightCoordinates.forEach((hc, i) => {
                     result += `🎯 Highlight ${i + 1}: "${hc.text}"\n`;

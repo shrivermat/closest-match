@@ -23,19 +23,51 @@ export class TextHighlighter {
         if (!formattedText) return [];
         
         const highlights = [];
-        // Regex to extract text with background-color styling
-        const regex = /<strong[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>([^<]+)<\/strong>/g;
+        
+        this._log(`Parsing formatted text: "${formattedText}"`);
+        
+        // First, normalize escaped quotes to regular quotes
+        const normalizedText = formattedText.replace(/\\"/g, '"');
+        this._log(`Normalized text: "${normalizedText}"`);
+        
+        // Enhanced regex to extract text with background-color styling from any HTML tag
+        // Matches <tag style="...background-color: rgb(r,g,b)...">content</tag>
+        // Uses dotall flag to match across newlines and handles any content within tags
+        const regex = /<(\w+)[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>(.*?)<\/\1>/gs;
         let match;
         
-        while ((match = regex.exec(formattedText)) !== null) {
-            const [, rgbValues, text] = match;
+        this._log(`Using regex: ${regex}`);
+        
+        // Reset regex lastIndex to ensure we start from the beginning
+        regex.lastIndex = 0;
+        
+        // Test the regex with a simple case first on normalized text
+        const testMatch = normalizedText.match(/<span[^>]*style="[^"]*background-color:\s*rgb\([^)]+\)[^"]*"[^>]*>.*?<\/span>/gs);
+        this._log(`Simple span test matches:`, testMatch ? testMatch.length : 0);
+        if (testMatch) {
+            testMatch.forEach((match, i) => {
+                this._log(`Test match ${i + 1}: "${match}"`);
+            });
+        }
+        
+        while ((match = regex.exec(normalizedText)) !== null) {
+            const [fullMatch, tagName, rgbValues, text] = match;
+            this._log(`Regex match found: tag="${tagName}", rgb="${rgbValues}", text="${text}"`);
+            
             const [r, g, b] = rgbValues.split(',').map(v => parseInt(v.trim()));
             
-            highlights.push({
-                text: text.trim(),
-                color: { r, g, b },
-                hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-            });
+            // Clean up the text (remove HTML tags and normalize whitespace)
+            const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+            
+            if (cleanText) {
+                highlights.push({
+                    text: cleanText,
+                    color: { r, g, b },
+                    hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+                });
+                
+                this._log(`Found highlight: "${cleanText}" with color rgb(${r}, ${g}, ${b}) in <${tagName}> tag`);
+            }
         }
         
         this._log(`Parsed ${highlights.length} formatted text highlights:`, highlights);
