@@ -624,83 +624,95 @@
                 
                 const annotations = [];
                 
-                // 1. Extract background-color highlights
-                console.log('🔍 Parsing background-color highlights...');
-                const highlightRegex = /<(\w+)[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>(.*?)<\/\1>/gs;
-                let match;
-                highlightRegex.lastIndex = 0;
+                // Use DOMParser to properly handle nested HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(`<div>${normalizedText}</div>`, 'text/html');
+                const container = doc.querySelector('div');
                 
-                while ((match = highlightRegex.exec(normalizedText)) !== null) {
-                    const [fullMatch, tagName, rgbValues, text] = match;
-                    console.log(`🎯 Found highlight match: tag="${tagName}", rgb="${rgbValues}", text="${text}"`);
-                    
-                    const [r, g, b] = rgbValues.split(',').map(v => parseInt(v.trim()));
-                    
-                    // Clean up the text (remove HTML tags and normalize whitespace)
-                    const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-                    
-                    if (cleanText) {
-                        annotations.push({
-                            text: cleanText,
-                            type: 'highlight',
-                            color: { r, g, b },
-                            hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-                        });
-                        
-                        console.log(`✅ Added highlight: "${cleanText}" with color rgb(${r}, ${g}, ${b})`);
-                    }
+                if (!container) {
+                    console.warn('Failed to parse HTML content');
+                    return [];
                 }
                 
-                // 2. Extract strike-through annotations
-                console.log('🔍 Parsing strike-through annotations...');
-                const strikeRegex = /<s[^>]*>(.*?)<\/s>/gs;
-                strikeRegex.lastIndex = 0;
-                
-                while ((match = strikeRegex.exec(normalizedText)) !== null) {
-                    const [fullMatch, text] = match;
-                    console.log(`🎯 Found strike-through match: text="${text}"`);
-                    
-                    // Clean up the text (remove HTML tags and normalize whitespace)
-                    const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-                    
-                    if (cleanText) {
-                        annotations.push({
-                            text: cleanText,
-                            type: 'strikethrough',
-                            color: { r: 255, g: 0, b: 0 }, // Default red for strike-through
-                            hexColor: '#ff0000'
-                        });
-                        
-                        console.log(`✅ Added strike-through: "${cleanText}"`);
-                    }
-                }
-                
-                // 3. Extract underline annotations
-                console.log('🔍 Parsing underline annotations...');
-                const underlineRegex = /<u[^>]*>(.*?)<\/u>/gs;
-                underlineRegex.lastIndex = 0;
-                
-                while ((match = underlineRegex.exec(normalizedText)) !== null) {
-                    const [fullMatch, text] = match;
-                    console.log(`🎯 Found underline match: text="${text}"`);
-                    
-                    // Clean up the text (remove HTML tags and normalize whitespace)
-                    const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-                    
-                    if (cleanText) {
-                        annotations.push({
-                            text: cleanText,
-                            type: 'underline',
-                            color: { r: 0, g: 0, b: 255 }, // Default blue for underline
-                            hexColor: '#0000ff'
-                        });
-                        
-                        console.log(`✅ Added underline: "${cleanText}"`);
-                    }
-                }
+                // Recursively traverse the DOM tree to find annotations
+                this.extractAnnotationsFromNode(container, annotations);
                 
                 console.log('🎨 Parsed formatted text annotations:', annotations);
                 return annotations;
+            }
+
+            /**
+             * Recursively extract annotations from DOM nodes
+             */
+            extractAnnotationsFromNode(node, annotations) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    // Text node - no annotation here
+                    return;
+                }
+                
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const tagName = node.tagName.toLowerCase();
+                    
+                    // Check for annotation types
+                    if (tagName === 's') {
+                        // Strike-through annotation
+                        const text = node.textContent.trim();
+                        if (text) {
+                            annotations.push({
+                                text: text,
+                                type: 'strikethrough',
+                                color: { r: 255, g: 0, b: 0 }, // Default red for strike-through
+                                hexColor: '#ff0000'
+                            });
+                            console.log(`✅ Added strike-through: "${text}"`);
+                        }
+                        // Don't process children since we already got the text content
+                        return;
+                    }
+                    
+                    if (tagName === 'u') {
+                        // Underline annotation
+                        const text = node.textContent.trim();
+                        if (text) {
+                            annotations.push({
+                                text: text,
+                                type: 'underline',
+                                color: { r: 0, g: 0, b: 255 }, // Default blue for underline
+                                hexColor: '#0000ff'
+                            });
+                            console.log(`✅ Added underline: "${text}"`);
+                        }
+                        // Don't process children since we already got the text content
+                        return;
+                    }
+                    
+                    if ((tagName === 'span' || tagName === 'strong') && node.style && node.style.backgroundColor) {
+                        // Background color highlight
+                        const text = node.textContent.trim();
+                        const bgColor = node.style.backgroundColor;
+                        
+                        // Parse RGB color
+                        const rgbMatch = bgColor.match(/rgb\(([^)]+)\)/);
+                        if (rgbMatch && text) {
+                            const [r, g, b] = rgbMatch[1].split(',').map(v => parseInt(v.trim()));
+                            
+                            annotations.push({
+                                text: text,
+                                type: 'highlight',
+                                color: { r, g, b },
+                                hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+                            });
+                            console.log(`✅ Added highlight: "${text}" with color rgb(${r}, ${g}, ${b})`);
+                        }
+                        // Don't process children since we already got the text content
+                        return;
+                    }
+                }
+                
+                // Process child nodes for other elements
+                for (let child of node.childNodes) {
+                    this.extractAnnotationsFromNode(child, annotations);
+                }
             }
             
             async extractWordCoordinatesFromHocr(hocrContent, searchText, boundingBox) {
@@ -824,6 +836,7 @@
             // Match highlight text sections to specific word coordinates within the area
             matchHighlightTextToWords(wordsInArea, highlightSections) {
                 const highlightCoordinates = [];
+                const usedWordIndices = new Set(); // Track which words have been used
                 
                 console.log('🎯 Matching highlight sections to words:', highlightSections.map(h => h.text));
                 console.log('📝 Available words:', wordsInArea.map(w => w.text));
@@ -832,9 +845,17 @@
                     const searchWords = highlight.text.toLowerCase().split(/\s+/).filter(w => w.length > 0);
                     console.log(`🔍 Looking for highlight "${highlight.text}" (words: ${searchWords.join(', ')})`);
                     
-                    const matchedWords = this.findSequentialWordsInArea(wordsInArea, searchWords);
+                    const matchedWords = this.findSequentialWordsInArea(wordsInArea, searchWords, usedWordIndices);
                     
                     if (matchedWords.length > 0) {
+                        // Mark these words as used
+                        matchedWords.forEach(word => {
+                            const wordIndex = wordsInArea.indexOf(word);
+                            if (wordIndex !== -1) {
+                                usedWordIndices.add(wordIndex);
+                            }
+                        });
+                        
                         // Group matched words into lines and create quads for multi-line highlights
                         const quads = this.createQuadsFromWords(matchedWords);
                         
@@ -846,6 +867,7 @@
                         
                         highlightCoordinates.push({
                             text: highlight.text,
+                            type: highlight.type,
                             color: highlight.color,
                             hexColor: highlight.hexColor,
                             boundingBox: [x1, y1, x2, y2], // Overall bounding box for Rect
@@ -854,11 +876,11 @@
                             wordCount: matchedWords.length
                         });
                         
-                        console.log(`✅ Matched "${highlight.text}" to ${matchedWords.length} words in ${quads.length} quads`);
+                        console.log(`✅ Matched ${highlight.type} "${highlight.text}" to ${matchedWords.length} words in ${quads.length} quads`);
                         console.log(`📝 Matched words: ${matchedWords.map(w => w.text).join(' ')}`);
                         console.log(`📐 Quads:`, quads.map((q, i) => `Quad ${i+1}: [${q.x1}, ${q.y1}, ${q.x2}, ${q.y2}] (${q.words.map(w => w.text).join(' ')})`));
                     } else {
-                        console.warn(`⚠️ Could not find words for highlight: "${highlight.text}"`);
+                        console.warn(`⚠️ Could not find words for ${highlight.type}: "${highlight.text}"`);
                     }
                 }
                 
@@ -932,7 +954,7 @@
             }
             
             // Find sequential words in area that match the search terms
-            findSequentialWordsInArea(wordsInArea, searchWords) {
+            findSequentialWordsInArea(wordsInArea, searchWords, usedWordIndices = new Set()) {
                 if (!wordsInArea.length || !searchWords.length) return [];
                 
                 // Sort words by position (top to bottom, left to right)
@@ -944,6 +966,7 @@
                 console.log(`🔍 Searching ${searchWords.length} words in ${sortedWords.length} sorted words`);
                 console.log(`🎯 Search words: ${searchWords.join(', ')}`);
                 console.log(`📄 Available words: ${sortedWords.map(w => w.text).join(' ')}`);
+                console.log(`⏭️ Used word indices: ${Array.from(usedWordIndices)}`);
                 
                 // Use sliding window to find the best match
                 let bestMatch = [];
@@ -956,6 +979,13 @@
                     for (let wordIdx = startIdx; wordIdx < sortedWords.length && searchIdx < searchWords.length; wordIdx++) {
                         const word = sortedWords[wordIdx];
                         const searchWord = searchWords[searchIdx];
+                        const originalWordIndex = wordsInArea.indexOf(word);
+                        
+                        // Skip words that have already been used
+                        if (usedWordIndices.has(originalWordIndex)) {
+                            console.log(`⏭️ Skipping already used word: "${word.text}" at index ${originalWordIndex}`);
+                            continue;
+                        }
                         
                         if (this.wordsMatch(word.text, searchWord)) {
                             candidateWords.push(word);
@@ -999,11 +1029,18 @@
                 // Exact match
                 if (w1 === w2) return true;
                 
-                // Partial match (one contains the other)
+                // For very short search terms (like "DE"), be more restrictive
+                if (w2.length <= 2) {
+                    // Only match if the word contains the search term as a complete substring
+                    // and the word is reasonably short (to avoid matching "Dresden" for "DE")
+                    return w1.includes(w2) && w1.length <= w2.length + 3;
+                }
+                
+                // Partial match (one contains the other) for longer terms
                 if (w1.includes(w2) || w2.includes(w1)) return true;
                 
                 // For very short words, require exact match
-                if (w1.length <= 2 || w2.length <= 2) return false;
+                if (w1.length <= 2) return false;
                 
                 // Fuzzy similarity for longer words
                 return this.calculateWordSimilarity(w1, w2) > 0.8;
@@ -1590,11 +1627,11 @@
                                 try {
                                     console.log('🎨 Processing formatted text for highlights:', match.formattedText);
                                     
-                                    // Parse formatted text to extract highlight information
-                                    const highlights = this.parseFormattedText(match.formattedText);
+                                    // Parse formatted text to extract annotation information
+                                    const annotations = this.parseFormattedText(match.formattedText);
                                     
-                                    if (highlights.length > 0) {
-                                        console.log(`🔤 Found ${highlights.length} highlight sections:`, highlights.map(h => h.text));
+                                    if (annotations.length > 0) {
+                                        console.log(`🔤 Found ${annotations.length} annotation sections:`, annotations.map(a => `${a.type}: ${a.text}`));
                                         
                                         // NEW OPTIMIZED APPROACH: Extract words only within the found rectangle area
                                         const wordsInArea = await this.extractWordCoordinatesFromHocr(hocrContent, match.text, match.boundingBox);
@@ -1603,14 +1640,14 @@
                                             console.log(`🎯 Found ${wordsInArea.length} words within rectangle area`);
                                             console.log('📝 Words in area:', wordsInArea.map(w => w.text).join(' '));
                                             
-                                            // Match highlight text sections to specific word coordinates
-                                            const highlightCoordinates = this.matchHighlightTextToWords(wordsInArea, highlights);
+                                            // Match annotation text sections to specific word coordinates
+                                            const annotationCoordinates = this.matchHighlightTextToWords(wordsInArea, annotations);
                                             
-                                            console.log(`🎨 Created ${highlightCoordinates.length} highlight coordinate sets`);
+                                            console.log(`🎨 Created ${annotationCoordinates.length} annotation coordinate sets`);
                                             
-                                            // Create text highlight annotations for each matched highlight section
-                                            for (const highlightCoord of highlightCoordinates) {
-                                                console.log(`✨ Creating multi-line highlight annotation for: "${highlightCoord.text}" with ${highlightCoord.quads.length} quads`);
+                                            // Create text markup annotations for each matched annotation section
+                                            for (const highlightCoord of annotationCoordinates) {
+                                                console.log(`✨ Creating multi-line ${highlightCoord.type || 'highlight'} annotation for: "${highlightCoord.text}" with ${highlightCoord.quads.length} quads`);
                                                 
                                                 // Transform each quad to PDF space and collect QuadPoints
                                                 const allQuadPoints = [];
@@ -1647,11 +1684,28 @@
                                                 console.log(`📦 Overall PDF Rect: [${overallPdfRect.map(v => v.toFixed(2)).join(', ')}]`);
                                                 console.log(`📐 QuadPoints array length: ${allQuadPoints.length} (${allQuadPoints.length/8} quads)`);
                                                 
-                                                // Create text highlight annotation with multiple quads
+                                                // Determine annotation subtype based on annotation type
+                                                let annotationSubtype = 'Highlight';
+                                                let annotationOpacity = 0.5;
+                                                let annotationDescription = `Multi-line Highlight: ${highlightCoord.text}`;
+                                                
+                                                if (highlightCoord.type === 'strikethrough') {
+                                                    annotationSubtype = 'StrikeOut';
+                                                    annotationOpacity = 0.8;
+                                                    annotationDescription = `Strike-through: ${highlightCoord.text}`;
+                                                } else if (highlightCoord.type === 'underline') {
+                                                    annotationSubtype = 'Underline';
+                                                    annotationOpacity = 0.8;
+                                                    annotationDescription = `Underline: ${highlightCoord.text}`;
+                                                }
+                                                
+                                                console.log(`🎨 Creating ${annotationSubtype} annotation for: "${highlightCoord.text}"`);
+                                                
+                                                // Create text markup annotation with multiple quads
                                                 const highlightAnnotRef = pdfDoc.context.nextRef();
                                                 const highlightAnnotation = pdfDoc.context.obj({
                                                     Type: PDFLib.PDFName.of('Annot'),
-                                                    Subtype: PDFLib.PDFName.of('Highlight'),
+                                                    Subtype: PDFLib.PDFName.of(annotationSubtype),
                                                     Rect: pdfDoc.context.obj(overallPdfRect.map(v => PDFLib.PDFNumber.of(v))), // Overall bounding rectangle
                                                     QuadPoints: pdfDoc.context.obj(allQuadPoints.map(v => PDFLib.PDFNumber.of(v))), // Array of all quad points for multi-line highlighting
                                                     C: pdfDoc.context.obj([
@@ -1659,9 +1713,9 @@
                                                         PDFLib.PDFNumber.of(highlightCoord.color.g / 255),
                                                         PDFLib.PDFNumber.of(highlightCoord.color.b / 255)
                                                     ]),
-                                                    CA: PDFLib.PDFNumber.of(0.5), // Transparency
+                                                    CA: PDFLib.PDFNumber.of(annotationOpacity), // Transparency
                                                     F: PDFLib.PDFNumber.of(4), // Print flag
-                                                    Contents: PDFLib.PDFString.of(`Multi-line Highlight: ${highlightCoord.text}`)
+                                                    Contents: PDFLib.PDFString.of(annotationDescription)
                                                 });
                                                 
                                                 // Register the highlight annotation

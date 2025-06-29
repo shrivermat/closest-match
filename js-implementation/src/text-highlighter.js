@@ -30,84 +30,98 @@ export class TextHighlighter {
         const normalizedText = formattedText.replace(/\\"/g, '"');
         this._log(`Normalized text: "${normalizedText}"`);
         
-        // 1. Extract background-color highlights
-        const highlightRegex = /<(\w+)[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>(.*?)<\/\1>/gs;
-        let match;
+        // Use DOMParser to properly handle nested HTML
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<div>${normalizedText}</div>`, 'text/html');
+        const container = doc.querySelector('div');
         
-        this._log(`Parsing background-color highlights...`);
-        highlightRegex.lastIndex = 0;
-        
-        while ((match = highlightRegex.exec(normalizedText)) !== null) {
-            const [fullMatch, tagName, rgbValues, text] = match;
-            this._log(`Found highlight match: tag="${tagName}", rgb="${rgbValues}", text="${text}"`);
-            
-            const [r, g, b] = rgbValues.split(',').map(v => parseInt(v.trim()));
-            
-            // Clean up the text (remove HTML tags and normalize whitespace)
-            const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-            
-            if (cleanText) {
-                annotations.push({
-                    text: cleanText,
-                    type: 'highlight',
-                    color: { r, g, b },
-                    hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-                });
-                
-                this._log(`Added highlight: "${cleanText}" with color rgb(${r}, ${g}, ${b})`);
-            }
+        if (!container) {
+            this._log('Failed to parse HTML content');
+            return [];
         }
         
-        // 2. Extract strike-through annotations
-        const strikeRegex = /<s[^>]*>(.*?)<\/s>/gs;
-        this._log(`Parsing strike-through annotations...`);
-        strikeRegex.lastIndex = 0;
-        
-        while ((match = strikeRegex.exec(normalizedText)) !== null) {
-            const [fullMatch, text] = match;
-            this._log(`Found strike-through match: text="${text}"`);
-            
-            // Clean up the text (remove HTML tags and normalize whitespace)
-            const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-            
-            if (cleanText) {
-                annotations.push({
-                    text: cleanText,
-                    type: 'strikethrough',
-                    color: { r: 255, g: 0, b: 0 }, // Default red for strike-through
-                    hexColor: '#ff0000'
-                });
-                
-                this._log(`Added strike-through: "${cleanText}"`);
-            }
-        }
-        
-        // 3. Extract underline annotations
-        const underlineRegex = /<u[^>]*>(.*?)<\/u>/gs;
-        this._log(`Parsing underline annotations...`);
-        underlineRegex.lastIndex = 0;
-        
-        while ((match = underlineRegex.exec(normalizedText)) !== null) {
-            const [fullMatch, text] = match;
-            this._log(`Found underline match: text="${text}"`);
-            
-            // Clean up the text (remove HTML tags and normalize whitespace)
-            const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-            
-            if (cleanText) {
-                annotations.push({
-                    text: cleanText,
-                    type: 'underline',
-                    color: { r: 0, g: 0, b: 255 }, // Default blue for underline
-                    hexColor: '#0000ff'
-                });
-                
-                this._log(`Added underline: "${cleanText}"`);
-            }
-        }
+        // Recursively traverse the DOM tree to find annotations
+        this._extractAnnotationsFromNode(container, annotations);
         
         this._log(`Parsed ${annotations.length} formatted text annotations:`, annotations);
         return annotations;
+    }
+
+    /**
+     * Recursively extract annotations from DOM nodes
+     * @private
+     * @param {Node} node - DOM node to process
+     * @param {Array} annotations - Array to collect annotations
+     */
+    _extractAnnotationsFromNode(node, annotations) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            // Text node - no annotation here
+            return;
+        }
+        
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName.toLowerCase();
+            
+            // Check for annotation types
+            if (tagName === 's') {
+                // Strike-through annotation
+                const text = node.textContent.trim();
+                if (text) {
+                    annotations.push({
+                        text: text,
+                        type: 'strikethrough',
+                        color: { r: 255, g: 0, b: 0 }, // Default red for strike-through
+                        hexColor: '#ff0000'
+                    });
+                    this._log(`Added strike-through: "${text}"`);
+                }
+                // Don't process children since we already got the text content
+                return;
+            }
+            
+            if (tagName === 'u') {
+                // Underline annotation
+                const text = node.textContent.trim();
+                if (text) {
+                    annotations.push({
+                        text: text,
+                        type: 'underline',
+                        color: { r: 0, g: 0, b: 255 }, // Default blue for underline
+                        hexColor: '#0000ff'
+                    });
+                    this._log(`Added underline: "${text}"`);
+                }
+                // Don't process children since we already got the text content
+                return;
+            }
+            
+            if ((tagName === 'span' || tagName === 'strong') && node.style && node.style.backgroundColor) {
+                // Background color highlight
+                const text = node.textContent.trim();
+                const bgColor = node.style.backgroundColor;
+                
+                // Parse RGB color
+                const rgbMatch = bgColor.match(/rgb\(([^)]+)\)/);
+                if (rgbMatch && text) {
+                    const [r, g, b] = rgbMatch[1].split(',').map(v => parseInt(v.trim()));
+                    
+                    annotations.push({
+                        text: text,
+                        type: 'highlight',
+                        color: { r, g, b },
+                        hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+                    });
+                    this._log(`Added highlight: "${text}" with color rgb(${r}, ${g}, ${b})`);
+                }
+                // Don't process children since we already got the text content
+                return;
+            }
+        }
+        
+        // Process child nodes for other elements
+        for (let child of node.childNodes) {
+            this._extractAnnotationsFromNode(child, annotations);
+        }
     }
 
     /**
@@ -188,6 +202,7 @@ export class TextHighlighter {
      */
     matchAnnotationTextToWords(wordsInArea, annotationSections) {
         const annotationCoordinates = [];
+        const usedWordIndices = new Set(); // Track which words have been used
         
         this._log('Matching annotation sections to words:', annotationSections.map(a => `${a.type}: "${a.text}"`));
         this._log('Available words:', wordsInArea.map(w => w.text));
@@ -196,9 +211,17 @@ export class TextHighlighter {
             const searchWords = annotation.text.toLowerCase().split(/\s+/).filter(w => w.length > 0);
             this._log(`Looking for ${annotation.type} "${annotation.text}" (words: ${searchWords.join(', ')})`);
             
-            const matchedWords = this._findSequentialWordsInArea(wordsInArea, searchWords);
+            const matchedWords = this._findSequentialWordsInArea(wordsInArea, searchWords, usedWordIndices);
             
             if (matchedWords.length > 0) {
+                // Mark these words as used
+                matchedWords.forEach(word => {
+                    const wordIndex = wordsInArea.indexOf(word);
+                    if (wordIndex !== -1) {
+                        usedWordIndices.add(wordIndex);
+                    }
+                });
+                
                 // Group matched words into lines and create quads for multi-line annotations
                 const quads = this._createQuadsFromWords(matchedWords);
                 
@@ -317,9 +340,10 @@ export class TextHighlighter {
      * @private
      * @param {Array} wordsInArea - Available words
      * @param {Array} searchWords - Words to search for
+     * @param {Set} usedWordIndices - Indices of words already used by previous annotations
      * @returns {Array} Best matching word sequence
      */
-    _findSequentialWordsInArea(wordsInArea, searchWords) {
+    _findSequentialWordsInArea(wordsInArea, searchWords, usedWordIndices = new Set()) {
         if (!wordsInArea.length || !searchWords.length) return [];
         
         // Sort words by position (top to bottom, left to right)
@@ -331,6 +355,7 @@ export class TextHighlighter {
         this._log(`Searching ${searchWords.length} words in ${sortedWords.length} sorted words`);
         this._log(`Search words: ${searchWords.join(', ')}`);
         this._log(`Available words: ${sortedWords.map(w => w.text).join(' ')}`);
+        this._log(`Used word indices: ${Array.from(usedWordIndices)}`);
         
         // Use sliding window to find the best match
         let bestMatch = [];
@@ -343,6 +368,13 @@ export class TextHighlighter {
             for (let wordIdx = startIdx; wordIdx < sortedWords.length && searchIdx < searchWords.length; wordIdx++) {
                 const word = sortedWords[wordIdx];
                 const searchWord = searchWords[searchIdx];
+                const originalWordIndex = wordsInArea.indexOf(word);
+                
+                // Skip words that have already been used
+                if (usedWordIndices.has(originalWordIndex)) {
+                    this._log(`⏭️ Skipping already used word: "${word.text}" at index ${originalWordIndex}`);
+                    continue;
+                }
                 
                 if (this._wordsMatch(word.text, searchWord)) {
                     candidateWords.push(word);
@@ -389,11 +421,18 @@ export class TextHighlighter {
         // Exact match
         if (w1 === w2) return true;
         
-        // Partial match (one contains the other)
+        // For very short search terms (like "DE"), be more restrictive
+        if (w2.length <= 2) {
+            // Only match if the word contains the search term as a complete substring
+            // and the word is reasonably short (to avoid matching "Dresden" for "DE")
+            return w1.includes(w2) && w1.length <= w2.length + 3;
+        }
+        
+        // Partial match (one contains the other) for longer terms
         if (w1.includes(w2) || w2.includes(w1)) return true;
         
         // For very short words, require exact match
-        if (w1.length <= 2 || w2.length <= 2) return false;
+        if (w1.length <= 2) return false;
         
         // Fuzzy similarity for longer words
         return this._calculateWordSimilarity(w1, w2) > 0.8;
