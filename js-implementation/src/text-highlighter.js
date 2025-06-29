@@ -22,7 +22,7 @@ export class TextHighlighter {
     parseFormattedText(formattedText) {
         if (!formattedText) return [];
         
-        const highlights = [];
+        const annotations = [];
         
         this._log(`Parsing formatted text: "${formattedText}"`);
         
@@ -30,29 +30,16 @@ export class TextHighlighter {
         const normalizedText = formattedText.replace(/\\"/g, '"');
         this._log(`Normalized text: "${normalizedText}"`);
         
-        // Enhanced regex to extract text with background-color styling from any HTML tag
-        // Matches <tag style="...background-color: rgb(r,g,b)...">content</tag>
-        // Uses dotall flag to match across newlines and handles any content within tags
-        const regex = /<(\w+)[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>(.*?)<\/\1>/gs;
+        // 1. Extract background-color highlights
+        const highlightRegex = /<(\w+)[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>(.*?)<\/\1>/gs;
         let match;
         
-        this._log(`Using regex: ${regex}`);
+        this._log(`Parsing background-color highlights...`);
+        highlightRegex.lastIndex = 0;
         
-        // Reset regex lastIndex to ensure we start from the beginning
-        regex.lastIndex = 0;
-        
-        // Test the regex with a simple case first on normalized text
-        const testMatch = normalizedText.match(/<span[^>]*style="[^"]*background-color:\s*rgb\([^)]+\)[^"]*"[^>]*>.*?<\/span>/gs);
-        this._log(`Simple span test matches:`, testMatch ? testMatch.length : 0);
-        if (testMatch) {
-            testMatch.forEach((match, i) => {
-                this._log(`Test match ${i + 1}: "${match}"`);
-            });
-        }
-        
-        while ((match = regex.exec(normalizedText)) !== null) {
+        while ((match = highlightRegex.exec(normalizedText)) !== null) {
             const [fullMatch, tagName, rgbValues, text] = match;
-            this._log(`Regex match found: tag="${tagName}", rgb="${rgbValues}", text="${text}"`);
+            this._log(`Found highlight match: tag="${tagName}", rgb="${rgbValues}", text="${text}"`);
             
             const [r, g, b] = rgbValues.split(',').map(v => parseInt(v.trim()));
             
@@ -60,18 +47,67 @@ export class TextHighlighter {
             const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
             
             if (cleanText) {
-                highlights.push({
+                annotations.push({
                     text: cleanText,
+                    type: 'highlight',
                     color: { r, g, b },
                     hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
                 });
                 
-                this._log(`Found highlight: "${cleanText}" with color rgb(${r}, ${g}, ${b}) in <${tagName}> tag`);
+                this._log(`Added highlight: "${cleanText}" with color rgb(${r}, ${g}, ${b})`);
             }
         }
         
-        this._log(`Parsed ${highlights.length} formatted text highlights:`, highlights);
-        return highlights;
+        // 2. Extract strike-through annotations
+        const strikeRegex = /<s[^>]*>(.*?)<\/s>/gs;
+        this._log(`Parsing strike-through annotations...`);
+        strikeRegex.lastIndex = 0;
+        
+        while ((match = strikeRegex.exec(normalizedText)) !== null) {
+            const [fullMatch, text] = match;
+            this._log(`Found strike-through match: text="${text}"`);
+            
+            // Clean up the text (remove HTML tags and normalize whitespace)
+            const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+            
+            if (cleanText) {
+                annotations.push({
+                    text: cleanText,
+                    type: 'strikethrough',
+                    color: { r: 255, g: 0, b: 0 }, // Default red for strike-through
+                    hexColor: '#ff0000'
+                });
+                
+                this._log(`Added strike-through: "${cleanText}"`);
+            }
+        }
+        
+        // 3. Extract underline annotations
+        const underlineRegex = /<u[^>]*>(.*?)<\/u>/gs;
+        this._log(`Parsing underline annotations...`);
+        underlineRegex.lastIndex = 0;
+        
+        while ((match = underlineRegex.exec(normalizedText)) !== null) {
+            const [fullMatch, text] = match;
+            this._log(`Found underline match: text="${text}"`);
+            
+            // Clean up the text (remove HTML tags and normalize whitespace)
+            const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+            
+            if (cleanText) {
+                annotations.push({
+                    text: cleanText,
+                    type: 'underline',
+                    color: { r: 0, g: 0, b: 255 }, // Default blue for underline
+                    hexColor: '#0000ff'
+                });
+                
+                this._log(`Added underline: "${cleanText}"`);
+            }
+        }
+        
+        this._log(`Parsed ${annotations.length} formatted text annotations:`, annotations);
+        return annotations;
     }
 
     /**
@@ -145,25 +181,25 @@ export class TextHighlighter {
     }
 
     /**
-     * Match highlight text sections to specific word coordinates within the area
+     * Match annotation text sections to specific word coordinates within the area
      * @param {Array} wordsInArea - Words within the target area
-     * @param {Array} highlightSections - Parsed highlight sections
-     * @returns {Array} Array of highlight coordinate objects with quads
+     * @param {Array} annotationSections - Parsed annotation sections (highlights, strikethrough, underline)
+     * @returns {Array} Array of annotation coordinate objects with quads
      */
-    matchHighlightTextToWords(wordsInArea, highlightSections) {
-        const highlightCoordinates = [];
+    matchAnnotationTextToWords(wordsInArea, annotationSections) {
+        const annotationCoordinates = [];
         
-        this._log('Matching highlight sections to words:', highlightSections.map(h => h.text));
+        this._log('Matching annotation sections to words:', annotationSections.map(a => `${a.type}: "${a.text}"`));
         this._log('Available words:', wordsInArea.map(w => w.text));
         
-        for (const highlight of highlightSections) {
-            const searchWords = highlight.text.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-            this._log(`Looking for highlight "${highlight.text}" (words: ${searchWords.join(', ')})`);
+        for (const annotation of annotationSections) {
+            const searchWords = annotation.text.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+            this._log(`Looking for ${annotation.type} "${annotation.text}" (words: ${searchWords.join(', ')})`);
             
             const matchedWords = this._findSequentialWordsInArea(wordsInArea, searchWords);
             
             if (matchedWords.length > 0) {
-                // Group matched words into lines and create quads for multi-line highlights
+                // Group matched words into lines and create quads for multi-line annotations
                 const quads = this._createQuadsFromWords(matchedWords);
                 
                 // Calculate overall bounding box for all matched words (for the Rect property)
@@ -172,26 +208,39 @@ export class TextHighlighter {
                 const x2 = Math.max(...matchedWords.map(w => w.x2));
                 const y2 = Math.max(...matchedWords.map(w => w.y2));
                 
-                highlightCoordinates.push({
-                    text: highlight.text,
-                    color: highlight.color,
-                    hexColor: highlight.hexColor,
+                annotationCoordinates.push({
+                    text: annotation.text,
+                    type: annotation.type,
+                    color: annotation.color,
+                    hexColor: annotation.hexColor,
                     boundingBox: [x1, y1, x2, y2], // Overall bounding box for Rect
-                    quads: quads, // Array of quads for multi-line highlighting
+                    quads: quads, // Array of quads for multi-line annotations
                     words: matchedWords,
                     wordCount: matchedWords.length
                 });
                 
-                this._log(`✅ Matched "${highlight.text}" to ${matchedWords.length} words in ${quads.length} quads`);
+                this._log(`✅ Matched ${annotation.type} "${annotation.text}" to ${matchedWords.length} words in ${quads.length} quads`);
                 this._log(`📝 Matched words: ${matchedWords.map(w => w.text).join(' ')}`);
                 this._log(`📐 Quads:`, quads.map((q, i) => `Quad ${i+1}: [${q.x1}, ${q.y1}, ${q.x2}, ${q.y2}] (${q.words.map(w => w.text).join(' ')})`));
             } else {
-                this._log(`⚠️ Could not find words for highlight: "${highlight.text}"`);
+                this._log(`⚠️ Could not find words for ${annotation.type}: "${annotation.text}"`);
             }
         }
         
-        this._log(`Created ${highlightCoordinates.length} highlight coordinate sets`);
-        return highlightCoordinates;
+        this._log(`Created ${annotationCoordinates.length} annotation coordinate sets`);
+        return annotationCoordinates;
+    }
+
+    /**
+     * Backward compatibility method - alias for matchAnnotationTextToWords
+     * @param {Array} wordsInArea - Words within the target area
+     * @param {Array} highlightSections - Parsed highlight sections
+     * @returns {Array} Array of highlight coordinate objects with quads
+     */
+    matchHighlightTextToWords(wordsInArea, highlightSections) {
+        // Filter to only highlight types for backward compatibility
+        const highlights = highlightSections.filter(a => !a.type || a.type === 'highlight');
+        return this.matchAnnotationTextToWords(wordsInArea, highlights);
     }
 
     /**

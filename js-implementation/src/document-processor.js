@@ -255,11 +255,11 @@ export class DocumentProcessor {
             if (formattedText) {
                 this._log('Processing formatted text for highlights...');
                 
-                // Parse formatted text to extract highlight information
-                const highlights = this.textHighlighter.parseFormattedText(formattedText);
+                // Parse formatted text to extract annotation information (highlights, strikethrough, underline)
+                const annotations = this.textHighlighter.parseFormattedText(formattedText);
                 
-                if (highlights.length > 0) {
-                    this._log(`Found ${highlights.length} highlight sections:`, highlights.map(h => h.text));
+                if (annotations.length > 0) {
+                    this._log(`Found ${annotations.length} annotation sections:`, annotations.map(a => `${a.type}: "${a.text}"`));
                     
                     // Extract words within the bounding box area
                     const allWords = this.textHighlighter.extractAllWordsFromHocr(hocrContent);
@@ -271,14 +271,14 @@ export class DocumentProcessor {
                     if (wordsInArea.length > 0) {
                         this._log(`Found ${wordsInArea.length} words within rectangle area`);
                         
-                        // Match highlight text sections to specific word coordinates
-                        highlightCoordinates = this.textHighlighter.matchHighlightTextToWords(wordsInArea, highlights);
+                        // Match annotation text sections to specific word coordinates
+                        highlightCoordinates = this.textHighlighter.matchAnnotationTextToWords(wordsInArea, annotations);
                         
                         if (highlightCoordinates.length > 0) {
-                            this._log(`Created ${highlightCoordinates.length} highlight coordinate sets`);
+                            this._log(`Created ${highlightCoordinates.length} annotation coordinate sets`);
                             
-                            // Add text highlight annotations
-                            annotatedPdfBytes = await this.pdfAnnotator.addTextHighlights(
+                            // Add text annotations (highlights, strikethrough, underline)
+                            annotatedPdfBytes = await this.pdfAnnotator.addTextAnnotations(
                                 annotatedPdfBytes,
                                 highlightCoordinates,
                                 pageNumber,
@@ -286,15 +286,15 @@ export class DocumentProcessor {
                                 { opacity: options.highlightOpacity || 0.5 }
                             );
                             
-                            this._log('Text highlight annotations added successfully');
+                            this._log('Text annotations added successfully');
                         } else {
-                            this._log('No highlight coordinates could be generated');
+                            this._log('No annotation coordinates could be generated');
                         }
                     } else {
-                        this._log('No words found within rectangle area for highlighting');
+                        this._log('No words found within rectangle area for annotations');
                     }
                 } else {
-                    this._log('No background-color highlights found in formatted text');
+                    this._log('No annotations found in formatted text');
                 }
             }
             

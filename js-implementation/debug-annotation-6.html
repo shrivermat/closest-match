@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Annotation #6 Issue</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 4px; white-space: pre-wrap; font-family: monospace; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Annotation #6 PDF Corruption</h1>
+    <p><strong>Issue</strong>: PDF parser chokes on annotation #6 (zero-based index 5) with empty numeric value.</p>
+    <p><strong>Error</strong>: <code>ValueError: invalid literal for int() with base 10: b''</code></p>
+    
+    <button onclick="debugAnnotationCreation()">🧪 Debug All Annotation Creation</button>
+    <button onclick="generateTestWithValidation()">📄 Generate PDF with Full Validation</button>
+    <button onclick="testSpecificAnnotation6()">🎯 Test Annotation #6 Specifically</button>
+    
+    <div id="results"></div>
+
+    <!-- Load PDF-lib -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <script type="module">
+        import { TextHighlighter } from './src/text-highlighter.js';
+        import { DocumentProcessor } from './src/document-processor.js';
+        import { PDFAnnotator } from './src/pdf-annotator-browser.js';
+        
+        window.TextHighlighter = TextHighlighter;
+        window.DocumentProcessor = DocumentProcessor;
+        window.PDFAnnotator = PDFAnnotator;
+        
+        console.log('✅ Debug modules loaded');
+    </script>
+    
+    <script>
+        function showResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+        }
+        
+        async function debugAnnotationCreation() {
+            try {
+                showResult('🔍 Starting comprehensive annotation debug...', 'info');
+                
+                const highlighter = new TextHighlighter({ debugMode: true });
+                
+                // Parse the exact problematic formatted text
+                const formattedText = `<p>(75) Inventors: <s>Wolfram Kluge</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>): <u>Jeannette Zarbock</u>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>); <s>Tilo Ferchland</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>)<p>`;
+                
+                const annotations = highlighter.parseFormattedText(formattedText);
+                
+                let result = `📝 Parsed ${annotations.length} annotations:\n\n`;
+                annotations.forEach((ann, i) => {
+                    result += `Annotation #${i + 1} (Index ${i}):\n`;
+                    result += `  Type: ${ann.type}\n`;
+                    result += `  Text: "${ann.text}"\n`;
+                    result += `  Color: r=${ann.color.r}, g=${ann.color.g}, b=${ann.color.b}\n`;
+                    result += `  Hex: ${ann.hexColor}\n`;
+                    
+                    // Validate each color component
+                    const rValid = Number.isFinite(ann.color.r) && ann.color.r >= 0 && ann.color.r <= 255;
+                    const gValid = Number.isFinite(ann.color.g) && ann.color.g >= 0 && ann.color.g <= 255;
+                    const bValid = Number.isFinite(ann.color.b) && ann.color.b >= 0 && ann.color.b <= 255;
+                    result += `  Color valid: r=${rValid}, g=${gValid}, b=${bValid}\n`;
+                    
+                    if (i === 5) { // Annotation #6 (index 5)
+                        result += `  🚨 THIS IS ANNOTATION #6 - THE PROBLEMATIC ONE!\n`;
+                        result += `  🔍 Detailed analysis:\n`;
+                        result += `    - Color r: ${ann.color.r} (type: ${typeof ann.color.r})\n`;
+                        result += `    - Color g: ${ann.color.g} (type: ${typeof ann.color.g})\n`;
+                        result += `    - Color b: ${ann.color.b} (type: ${typeof ann.color.b})\n`;
+                        result += `    - Text length: ${ann.text?.length || 'undefined'}\n`;
+                        result += `    - Type valid: ${['highlight', 'strikethrough', 'underline'].includes(ann.type)}\n`;
+                    }
+                    
+                    result += `\n`;
+                });
+                
+                showResult(result, 'info');
+                
+            } catch (error) {
+                showResult(`❌ Error during annotation debug: ${error.message}\n\nStack trace:\n${error.stack}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        async function testSpecificAnnotation6() {
+            try {
+                showResult('🎯 Testing annotation #6 specifically...', 'info');
+                
+                // Create a simple test with just the 6th annotation
+                const testAnnotations = [];
+                
+                // Create 6 annotations to simulate the real scenario
+                for (let i = 0; i < 6; i++) {
+                    testAnnotations.push({
+                        text: `Test ${i + 1}`,
+                        type: i % 3 === 0 ? 'highlight' : (i % 3 === 1 ? 'strikethrough' : 'underline'),
+                        color: { r: 255, g: (i * 40) % 256, b: (i * 80) % 256 },
+                        quads: [{ x1: 50, y1: 700 - (i * 20), x2: 150, y2: 715 - (i * 20), text: `Test ${i + 1}` }],
+                        wordCount: 1
+                    });
+                }
+                
+                // Focus on annotation #6 (index 5)
+                const annotation6 = testAnnotations[5];
+                
+                let result = `🎯 Annotation #6 (Index 5) Details:\n\n`;
+                result += `Text: "${annotation6.text}"\n`;
+                result += `Type: ${annotation6.type}\n`;
+                result += `Color: r=${annotation6.color.r}, g=${annotation6.color.g}, b=${annotation6.color.b}\n`;
+                result += `Quads: ${annotation6.quads.length}\n\n`;
+                
+                // Test color normalization (this is where issues often occur)
+                const normalizedColors = [
+                    Number((annotation6.color.r / 255).toFixed(6)),
+                    Number((annotation6.color.g / 255).toFixed(6)),
+                    Number((annotation6.color.b / 255).toFixed(6))
+                ];
+                
+                result += `🧮 Color Normalization Test:\n`;
+                result += `Original: [${annotation6.color.r}, ${annotation6.color.g}, ${annotation6.color.b}]\n`;
+                result += `Normalized: [${normalizedColors.join(', ')}]\n`;
+                result += `All finite: ${normalizedColors.every(v => Number.isFinite(v))}\n`;
+                result += `All valid range: ${normalizedColors.every(v => v >= 0 && v <= 1)}\n\n`;
+                
+                // Test creating minimal PDF with just this annotation
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const page = pdfDoc.addPage([600, 800]);
+                page.drawText('Test document for annotation #6', { x: 50, y: 750, size: 12 });
+                const pdfBytes = await pdfDoc.save();
+                
+                const annotator = new PDFAnnotator({ debugMode: true });
+                
+                try {
+                    result += `🔧 Creating PDF with annotation #6...\n`;
+                    const annotatedBytes = await annotator.addTextAnnotations(
+                        pdfBytes, 
+                        [annotation6], // Only annotation #6
+                        0,
+                        { width: 600, height: 800 },
+                        { opacity: 0.5 }
+                    );
+                    
+                    const blob = new Blob([annotatedBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    result += `✅ Annotation #6 created successfully!\n`;
+                    result += `📄 <a href="${url}" download="annotation-6-only.pdf">Download PDF with only annotation #6</a>\n`;
+                    
+                } catch (annotationError) {
+                    result += `❌ Failed to create annotation #6: ${annotationError.message}\n`;
+                    result += `This is likely the source of the PDF corruption!\n`;
+                }
+                
+                showResult(result, 'info');
+                
+            } catch (error) {
+                showResult(`❌ Error during annotation #6 test: ${error.message}\n\nStack trace:\n${error.stack}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        async function generateTestWithValidation() {
+            try {
+                showResult('🔄 Generating PDF with full validation enabled...', 'info');
+                
+                // Load real files
+                const [pdfResponse, hocrResponse] = await Promise.all([
+                    fetch('./demo/document.pdf'),
+                    fetch('./demo/document.hocr')
+                ]);
+                
+                if (!pdfResponse.ok || !hocrResponse.ok) {
+                    throw new Error(`Failed to load files: PDF=${pdfResponse.status}, hOCR=${hocrResponse.status}`);
+                }
+                
+                const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+                const hocrContent = await hocrResponse.text();
+                
+                const processor = new DocumentProcessor({ debugMode: true });
+                
+                const searchText = "(75) Inventors: Wolfram Kluge, Dresden (DE): Jeannette Zarbock, Dresden (DE); Tilo Ferchland, Dresden (DE)";
+                const formattedText = `<p>(75) Inventors: <s>Wolfram Kluge</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>): <u>Jeannette Zarbock</u>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>); <s>Tilo Ferchland</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>)<p>`;
+                
+                let result = '🔄 Starting PDF generation with enhanced validation...\n\n';
+                
+                const startTime = Date.now();
+                const processResult = await processor.processDocumentWithHighlights(
+                    hocrContent,
+                    pdfBytes,
+                    searchText,
+                    formattedText,
+                    {
+                        pageNumber: 0,
+                        color: [1, 0, 0],
+                        opacity: 0.3,
+                        highlightOpacity: 0.4
+                    }
+                );
+                const endTime = Date.now();
+                
+                if (processResult.success) {
+                    const blob = new Blob([processResult.annotatedPdf], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    result += `✅ PDF Generated Successfully!\n`;
+                    result += `⏱️ Processing time: ${endTime - startTime}ms\n`;
+                    result += `📊 Annotations created: ${processResult.metadata.highlightsCreated}\n\n`;
+                    
+                    if (processResult.highlightCoordinates) {
+                        result += `🎨 Annotation Details:\n`;
+                        processResult.highlightCoordinates.forEach((hc, i) => {
+                            result += `   #${i + 1}. ${hc.type.toUpperCase()}: "${hc.text}" (${hc.quads.length} quads)\n`;
+                            if (i === 5) { // Annotation #6
+                                result += `        🚨 THIS IS ANNOTATION #6!\n`;
+                                result += `        Color: ${hc.hexColor}\n`;
+                                result += `        Quads: ${hc.quads.length}\n`;
+                            }
+                        });
+                    }
+                    
+                    result += `\n📄 <a href="${url}" download="debug-validation-test.pdf">Download PDF with Enhanced Validation</a>\n`;
+                    result += `\n🔍 Test this PDF in Adobe Acrobat to see if annotation #6 still causes issues.`;
+                    
+                    showResult(result, 'success');
+                } else {
+                    showResult(`❌ PDF generation failed: ${processResult.error}`, 'error');
+                }
+                
+            } catch (error) {
+                showResult(`❌ Error during PDF generation: ${error.message}\n\nStack trace:\n${error.stack}`, 'error');
+                console.error('PDF generation error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

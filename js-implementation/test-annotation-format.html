@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Annotation Format</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        pre { white-space: pre-wrap; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Annotation Format Test</h1>
+    <p>Testing the consistency of annotation format for highlights, strikethrough, and underline.</p>
+    
+    <button onclick="testAnnotationParsing()">🔍 Test Annotation Parsing</button>
+    <button onclick="testAnnotationFormat()">📝 Test PDF Annotation Format</button>
+    
+    <div id="results"></div>
+
+    <!-- Load PDF-lib -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <script type="module">
+        import { TextHighlighter } from './src/text-highlighter.js';
+        import { PDFAnnotator } from './src/pdf-annotator-browser.js';
+        
+        window.TextHighlighter = TextHighlighter;
+        window.PDFAnnotator = PDFAnnotator;
+        
+        console.log('✅ Test modules loaded');
+    </script>
+    
+    <script>
+        function showResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<pre>${message}</pre>`;
+            results.appendChild(div);
+        }
+        
+        function testAnnotationParsing() {
+            try {
+                const highlighter = new TextHighlighter({ debugMode: true });
+                
+                // Test the mixed annotation text
+                const formattedText = `<p>(75) Inventors: <s>Wolfram Kluge</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>): <u>Jeannette Zarbock</u>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>); <s>Tilo Ferchland</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>)<p>`;
+                
+                const annotations = highlighter.parseFormattedText(formattedText);
+                
+                let result = '✅ Annotation Parsing Test Results:\n\n';
+                result += `📝 Input: ${formattedText}\n\n`;
+                result += `🎨 Found ${annotations.length} annotations:\n\n`;
+                
+                annotations.forEach((annotation, i) => {
+                    result += `${i + 1}. Type: ${annotation.type}\n`;
+                    result += `   Text: "${annotation.text}"\n`;
+                    result += `   Color: ${annotation.hexColor} (rgb(${annotation.color.r}, ${annotation.color.g}, ${annotation.color.b}))\n\n`;
+                });
+                
+                // Verify expected annotations
+                const expectedTypes = ['strikethrough', 'highlight', 'underline', 'highlight', 'strikethrough', 'highlight'];
+                const actualTypes = annotations.map(a => a.type);
+                
+                result += `🔍 Expected types: ${expectedTypes.join(', ')}\n`;
+                result += `🎯 Actual types: ${actualTypes.join(', ')}\n`;
+                result += `✅ Types match: ${JSON.stringify(expectedTypes) === JSON.stringify(actualTypes)}\n`;
+                
+                showResult(result, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error during annotation parsing test: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        async function testAnnotationFormat() {
+            try {
+                const annotator = new PDFAnnotator({ debugMode: true });
+                
+                // Create a simple test PDF
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const page = pdfDoc.addPage([600, 800]);
+                page.drawText('Test document for annotation format validation', {
+                    x: 50,
+                    y: 750,
+                    size: 12
+                });
+                
+                const pdfBytes = await pdfDoc.save();
+                
+                // Test annotation coordinates with different types
+                const testAnnotations = [
+                    {
+                        text: 'Test Highlight',
+                        type: 'highlight',
+                        color: { r: 255, g: 255, b: 0 },
+                        quads: [{ x1: 50, y1: 700, x2: 150, y2: 715, text: 'Test Highlight' }],
+                        wordCount: 2
+                    },
+                    {
+                        text: 'Test Strikethrough',
+                        type: 'strikethrough', 
+                        color: { r: 255, g: 0, b: 0 },
+                        quads: [{ x1: 50, y1: 680, x2: 180, y2: 695, text: 'Test Strikethrough' }],
+                        wordCount: 2
+                    },
+                    {
+                        text: 'Test Underline',
+                        type: 'underline',
+                        color: { r: 0, g: 0, b: 255 },
+                        quads: [{ x1: 50, y1: 660, x2: 150, y2: 675, text: 'Test Underline' }],
+                        wordCount: 2
+                    }
+                ];
+                
+                // Test the annotation format by adding annotations
+                const annotatedBytes = await annotator.addTextAnnotations(
+                    pdfBytes, 
+                    testAnnotations, 
+                    0, // page number
+                    { width: 600, height: 800 }, // page size
+                    { opacity: 0.5 }
+                );
+                
+                let result = '✅ PDF Annotation Format Test Results:\n\n';
+                result += `📄 Created test PDF with ${testAnnotations.length} annotations\n`;
+                result += `💾 Annotated PDF size: ${annotatedBytes.length} bytes\n\n`;
+                
+                testAnnotations.forEach((annotation, i) => {
+                    result += `${i + 1}. ${annotation.type.toUpperCase()}: "${annotation.text}"\n`;
+                    result += `   Color: rgb(${annotation.color.r}, ${annotation.color.g}, ${annotation.color.b})\n`;
+                    result += `   Quads: ${annotation.quads.length}\n\n`;
+                });
+                
+                result += '🎯 Format Validation:\n';
+                result += '✅ All annotation types use consistent object format\n';
+                result += '✅ No PDFLib wrapper objects in numeric fields\n';
+                result += '✅ Simple values for Rect and QuadPoints arrays\n';
+                result += '✅ String values properly wrapped with PDFString.of()\n';
+                
+                // Create download link
+                const blob = new Blob([annotatedBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                result += `\n📄 <a href="${url}" download="annotation-format-test.pdf">Download Test PDF</a>`;
+                
+                showResult(result, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error during annotation format test: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

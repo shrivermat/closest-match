@@ -612,7 +612,7 @@
             }
             
             parseFormattedText(formattedText) {
-                if (!formattedText || !formattedText.includes('background-color')) {
+                if (!formattedText) {
                     return [];
                 }
                 
@@ -622,17 +622,15 @@
                 const normalizedText = formattedText.replace(/\\"/g, '"');
                 console.log('🔧 Normalized text:', normalizedText);
                 
-                const highlights = [];
-                // Enhanced regex to handle any HTML tag with background-color styling
-                // Matches <tag style="...background-color: rgb(r,g,b)...">content</tag>
-                // Uses dotall flag to match across newlines and handles any content within tags
-                const regex = /<(\w+)[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>(.*?)<\/\1>/gs;
+                const annotations = [];
+                
+                // 1. Extract background-color highlights
+                console.log('🔍 Parsing background-color highlights...');
+                const highlightRegex = /<(\w+)[^>]*style="[^"]*background-color:\s*rgb\(([^)]+)\);?[^"]*"[^>]*>(.*?)<\/\1>/gs;
                 let match;
+                highlightRegex.lastIndex = 0;
                 
-                // Reset regex lastIndex to ensure we start from the beginning
-                regex.lastIndex = 0;
-                
-                while ((match = regex.exec(normalizedText)) !== null) {
+                while ((match = highlightRegex.exec(normalizedText)) !== null) {
                     const [fullMatch, tagName, rgbValues, text] = match;
                     console.log(`🎯 Found highlight match: tag="${tagName}", rgb="${rgbValues}", text="${text}"`);
                     
@@ -642,18 +640,67 @@
                     const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
                     
                     if (cleanText) {
-                        highlights.push({
+                        annotations.push({
                             text: cleanText,
+                            type: 'highlight',
                             color: { r, g, b },
                             hexColor: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
                         });
                         
-                        console.log(`✅ Added highlight: "${cleanText}" with color rgb(${r}, ${g}, ${b}) in <${tagName}> tag`);
+                        console.log(`✅ Added highlight: "${cleanText}" with color rgb(${r}, ${g}, ${b})`);
                     }
                 }
                 
-                console.log('🎨 Parsed formatted text highlights:', highlights);
-                return highlights;
+                // 2. Extract strike-through annotations
+                console.log('🔍 Parsing strike-through annotations...');
+                const strikeRegex = /<s[^>]*>(.*?)<\/s>/gs;
+                strikeRegex.lastIndex = 0;
+                
+                while ((match = strikeRegex.exec(normalizedText)) !== null) {
+                    const [fullMatch, text] = match;
+                    console.log(`🎯 Found strike-through match: text="${text}"`);
+                    
+                    // Clean up the text (remove HTML tags and normalize whitespace)
+                    const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                    
+                    if (cleanText) {
+                        annotations.push({
+                            text: cleanText,
+                            type: 'strikethrough',
+                            color: { r: 255, g: 0, b: 0 }, // Default red for strike-through
+                            hexColor: '#ff0000'
+                        });
+                        
+                        console.log(`✅ Added strike-through: "${cleanText}"`);
+                    }
+                }
+                
+                // 3. Extract underline annotations
+                console.log('🔍 Parsing underline annotations...');
+                const underlineRegex = /<u[^>]*>(.*?)<\/u>/gs;
+                underlineRegex.lastIndex = 0;
+                
+                while ((match = underlineRegex.exec(normalizedText)) !== null) {
+                    const [fullMatch, text] = match;
+                    console.log(`🎯 Found underline match: text="${text}"`);
+                    
+                    // Clean up the text (remove HTML tags and normalize whitespace)
+                    const cleanText = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                    
+                    if (cleanText) {
+                        annotations.push({
+                            text: cleanText,
+                            type: 'underline',
+                            color: { r: 0, g: 0, b: 255 }, // Default blue for underline
+                            hexColor: '#0000ff'
+                        });
+                        
+                        console.log(`✅ Added underline: "${cleanText}"`);
+                    }
+                }
+                
+                console.log('🎨 Parsed formatted text annotations:', annotations);
+                return annotations;
             }
             
             async extractWordCoordinatesFromHocr(hocrContent, searchText, boundingBox) {
@@ -1499,13 +1546,25 @@
                             // Create annotation dictionary manually with proper PDF objects
                             const annotRef = pdfDoc.context.nextRef();
                             const annotation = pdfDoc.context.obj({
-                                Type: 'Annot',
-                                Subtype: 'Square',
-                                Rect: [pdfCoords.x, pdfCoords.y, pdfCoords.x + pdfCoords.width, pdfCoords.y + pdfCoords.height],
-                                C: [color.r / 255, color.g / 255, color.b / 255],
-                                CA: 0.8,
-                                F: 4, // Print flag
-                                BS: { W: 2, S: 'S' },
+                                Type: PDFLib.PDFName.of('Annot'),
+                                Subtype: PDFLib.PDFName.of('Square'),
+                                Rect: pdfDoc.context.obj([
+                                    PDFLib.PDFNumber.of(pdfCoords.x),
+                                    PDFLib.PDFNumber.of(pdfCoords.y),
+                                    PDFLib.PDFNumber.of(pdfCoords.x + pdfCoords.width),
+                                    PDFLib.PDFNumber.of(pdfCoords.y + pdfCoords.height)
+                                ]),
+                                C: pdfDoc.context.obj([
+                                    PDFLib.PDFNumber.of(color.r / 255),
+                                    PDFLib.PDFNumber.of(color.g / 255),
+                                    PDFLib.PDFNumber.of(color.b / 255)
+                                ]),
+                                CA: PDFLib.PDFNumber.of(0.8),
+                                F: PDFLib.PDFNumber.of(4), // Print flag
+                                BS: pdfDoc.context.obj({
+                                    W: PDFLib.PDFNumber.of(2),
+                                    S: PDFLib.PDFName.of('S')
+                                }),
                                 Contents: PDFLib.PDFString.of(`Text Match: ${match.text.substring(0, 100)}${match.text.length > 100 ? '...' : ''}`)
                             });
                             
@@ -1591,13 +1650,17 @@
                                                 // Create text highlight annotation with multiple quads
                                                 const highlightAnnotRef = pdfDoc.context.nextRef();
                                                 const highlightAnnotation = pdfDoc.context.obj({
-                                                    Type: 'Annot',
-                                                    Subtype: 'Highlight',
-                                                    Rect: overallPdfRect, // Overall bounding rectangle
-                                                    QuadPoints: allQuadPoints, // Array of all quad points for multi-line highlighting
-                                                    C: [highlightCoord.color.r / 255, highlightCoord.color.g / 255, highlightCoord.color.b / 255],
-                                                    CA: 0.5, // Transparency
-                                                    F: 4, // Print flag
+                                                    Type: PDFLib.PDFName.of('Annot'),
+                                                    Subtype: PDFLib.PDFName.of('Highlight'),
+                                                    Rect: pdfDoc.context.obj(overallPdfRect.map(v => PDFLib.PDFNumber.of(v))), // Overall bounding rectangle
+                                                    QuadPoints: pdfDoc.context.obj(allQuadPoints.map(v => PDFLib.PDFNumber.of(v))), // Array of all quad points for multi-line highlighting
+                                                    C: pdfDoc.context.obj([
+                                                        PDFLib.PDFNumber.of(highlightCoord.color.r / 255),
+                                                        PDFLib.PDFNumber.of(highlightCoord.color.g / 255),
+                                                        PDFLib.PDFNumber.of(highlightCoord.color.b / 255)
+                                                    ]),
+                                                    CA: PDFLib.PDFNumber.of(0.5), // Transparency
+                                                    F: PDFLib.PDFNumber.of(4), // Print flag
                                                     Contents: PDFLib.PDFString.of(`Multi-line Highlight: ${highlightCoord.text}`)
                                                 });
                                                 
@@ -1640,8 +1703,8 @@
                     }
                 }
                 
-                // Generate PDF bytes and return as blob
-                const pdfBytes = await pdfDoc.save();
+                // Generate PDF bytes and return as blob with proper xref+trailer format
+                const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
                 
                 // Count actual annotations on the page
                 const pageAnnots = page.node.get(PDFLib.PDFName.of('Annots'));

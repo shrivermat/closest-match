@@ -17,3 +17,32 @@ Problem ones:
 B2 5/2005 Son et al. 7,307,907 B2 12/2007 Houston 7,345,931 B2 3/2008 Partsch et
 
 (10) Patent No.: (45) Date of Patent:
+
+
+
+
+
+
+
+(54) CIRCUIT AND METHOD FOR OPERATING A CIRCUIT
+
+<strong>(54) </strong><strong style=\"background-color: rgb(254, 255, 1);\">CIRCUIT AND METHOD</strong><strong> FOR </strong><strong style=\"background-color: rgb(109, 217, 255);\">OPERATING </strong><strong>A CIRCUIT</strong>
+
+
+
+
+(75) Inventors: Wolfram Kluge, Dresden (DE): Jeannette Zarbock, Dresden (DE); Tilo Ferchland, Dresden (DE)
+
+<p>(75) Inventors: <s>Wolfram Kluge</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>): <u>Jeannette Zarbock</u>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>); <s>Tilo Ferchland</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>)<p>
+
+
+
+(57) ABSTRACT A circuit and method for operating a circuit is provided that includes a circuit section that has a number of memory ele ments, a first Voltage regulator that can be connected or is connected to the circuit section in order to operate the circuit section, a second Voltage regulator that can be connected or is connected to the circuit section in order to preserve an infor mation item stored in the memory elements, a Switching device that is connected to the circuit section and is designed to deactivate and activate inputs of the circuit section. The circuit being configured to control a deactivation and activa tion of the first Voltage regulator and the deactivation and activation of the inputs of the circuit section.
+
+<p>(57) <span style=\"background-color: rgb(138, 255, 101);\">ABSTRACT A</span> circuit and method for operating a circuit is provided that includes a circuit section that has a number of memory ele ments, a first Voltage regulator that can be connected or is connected to the circuit section in order <span style=\"background-color: rgb(254, 255, 1);\">to operate the circuit section, a second Voltage regulator that can be connected or is connected to the circuit section in order to preserve an infor mation item stored in the memory elements,</span> a Switching device that is connected to the circuit section and is designed to deactivate and activate inputs of the circuit section. The circuit being configured to <span style=\"background-color: rgb(109, 217, 255);\">control a deactivation</span> and activa tion of the first Voltage regulator and the deactivation and activation of the inputs of the circuit section.<p>
+
+
+
+
+
+

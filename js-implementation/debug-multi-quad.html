@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Multi-Quad Annotation Issue</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 4px; white-space: pre-wrap; font-family: monospace; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Multi-Quad Annotation #5</h1>
+    <p><strong>Issue</strong>: Annotation #5 (multi-quad strikethrough) has empty numeric value causing PDF corruption.</p>
+    <p><strong>Focus</strong>: The 3-quad strikethrough annotation "DE): Jeannette Zarbock, Dresden (DE); Tilo Ferchland"</p>
+    
+    <button onclick="testMultiQuadAnnotation()">🧪 Test Multi-Quad Annotation Creation</button>
+    <button onclick="testSingleQuadFallback()">🔄 Test Single-Quad Fallback</button>
+    <button onclick="compareAnnotationFormats()">📊 Compare Single vs Multi-Quad Formats</button>
+    
+    <div id="results"></div>
+
+    <!-- Load PDF-lib -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <script type="module">
+        import { PDFAnnotator } from './src/pdf-annotator-browser.js';
+        
+        window.PDFAnnotator = PDFAnnotator;
+        
+        console.log('✅ Debug modules loaded');
+    </script>
+    
+    <script>
+        function showResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+        }
+        
+        async function testMultiQuadAnnotation() {
+            try {
+                showResult('🧪 Testing multi-quad annotation creation...', 'info');
+                
+                // Create a simple PDF
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const page = pdfDoc.addPage([600, 800]);
+                page.drawText('Multi-line text for annotation testing', { x: 50, y: 750, size: 12 });
+                const pdfBytes = await pdfDoc.save();
+                
+                // Create the exact problematic annotation #5 
+                const multiQuadAnnotation = {
+                    text: 'DE): Jeannette Zarbock, Dresden (DE); Tilo Ferchland',
+                    type: 'strikethrough',
+                    color: { r: 255, g: 0, b: 0 },
+                    quads: [
+                        { x1: 1004, y1: 622, x2: 1085, y2: 656, text: '(DE);' },
+                        { x1: 602, y1: 664, x2: 1211, y2: 698, text: 'Jeannette Zarbock, Dresden (DE); Tilo' },
+                        { x1: 602, y1: 706, x2: 771, y2: 737, text: 'Ferchland,' }
+                    ],
+                    wordCount: 7
+                };
+                
+                let result = `🎯 Multi-Quad Annotation Test:\n\n`;
+                result += `Text: "${multiQuadAnnotation.text}"\n`;
+                result += `Type: ${multiQuadAnnotation.type}\n`;
+                result += `Quads: ${multiQuadAnnotation.quads.length}\n\n`;
+                
+                multiQuadAnnotation.quads.forEach((quad, i) => {
+                    result += `Quad ${i + 1}: [${quad.x1}, ${quad.y1}, ${quad.x2}, ${quad.y2}] "${quad.text}"\n`;
+                });
+                
+                const annotator = new PDFAnnotator({ debugMode: true });
+                
+                try {
+                    result += `\n🔧 Creating PDF with multi-quad annotation...\n`;
+                    const annotatedBytes = await annotator.addTextAnnotations(
+                        pdfBytes, 
+                        [multiQuadAnnotation],
+                        0,
+                        { width: 600, height: 800 },
+                        { opacity: 0.8 }
+                    );
+                    
+                    const blob = new Blob([annotatedBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    result += `✅ Multi-quad annotation created successfully!\n`;
+                    result += `📄 <a href="${url}" download="multi-quad-test.pdf">Download Multi-Quad Test PDF</a>\n`;
+                    
+                } catch (annotationError) {
+                    result += `❌ Multi-quad annotation failed: ${annotationError.message}\n`;
+                    result += `Stack trace:\n${annotationError.stack}\n`;
+                }
+                
+                showResult(result, 'info');
+                
+            } catch (error) {
+                showResult(`❌ Error during multi-quad test: ${error.message}\n\nStack trace:\n${error.stack}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        async function testSingleQuadFallback() {
+            try {
+                showResult('🔄 Testing single-quad fallback approach...', 'info');
+                
+                // Create a simple PDF
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const page = pdfDoc.addPage([600, 800]);
+                page.drawText('Single-quad fallback test', { x: 50, y: 750, size: 12 });
+                const pdfBytes = await pdfDoc.save();
+                
+                // Create individual single-quad annotations instead of one multi-quad
+                const singleQuadAnnotations = [
+                    {
+                        text: '(DE);',
+                        type: 'strikethrough',
+                        color: { r: 255, g: 0, b: 0 },
+                        quads: [{ x1: 50, y1: 700, x2: 100, y2: 715, text: '(DE);' }],
+                        wordCount: 1
+                    },
+                    {
+                        text: 'Jeannette Zarbock, Dresden (DE); Tilo',
+                        type: 'strikethrough',
+                        color: { r: 255, g: 0, b: 0 },
+                        quads: [{ x1: 50, y1: 680, x2: 400, y2: 695, text: 'Jeannette Zarbock, Dresden (DE); Tilo' }],
+                        wordCount: 5
+                    },
+                    {
+                        text: 'Ferchland,',
+                        type: 'strikethrough',
+                        color: { r: 255, g: 0, b: 0 },
+                        quads: [{ x1: 50, y1: 660, x2: 150, y2: 675, text: 'Ferchland,' }],
+                        wordCount: 1
+                    }
+                ];
+                
+                let result = `🔄 Single-Quad Fallback Test:\n\n`;
+                result += `Creating ${singleQuadAnnotations.length} individual annotations instead of 1 multi-quad\n\n`;
+                
+                const annotator = new PDFAnnotator({ debugMode: true });
+                
+                try {
+                    const annotatedBytes = await annotator.addTextAnnotations(
+                        pdfBytes, 
+                        singleQuadAnnotations,
+                        0,
+                        { width: 600, height: 800 },
+                        { opacity: 0.8 }
+                    );
+                    
+                    const blob = new Blob([annotatedBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    result += `✅ Single-quad fallback created successfully!\n`;
+                    result += `📄 <a href="${url}" download="single-quad-fallback.pdf">Download Single-Quad Fallback PDF</a>\n`;
+                    result += `\n🔍 This approach splits the problematic multi-quad annotation into separate annotations.`;
+                    
+                } catch (annotationError) {
+                    result += `❌ Single-quad fallback failed: ${annotationError.message}\n`;
+                }
+                
+                showResult(result, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error during single-quad fallback test: ${error.message}\n\nStack trace:\n${error.stack}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        async function compareAnnotationFormats() {
+            try {
+                showResult('📊 Comparing annotation formats...', 'info');
+                
+                // Test data for comparison
+                const testData = {
+                    single: {
+                        text: 'Single Line',
+                        quads: [{ x1: 50, y1: 700, x2: 150, y2: 715, text: 'Single Line' }]
+                    },
+                    multi: {
+                        text: 'Multi Line Text',
+                        quads: [
+                            { x1: 50, y1: 700, x2: 100, y2: 715, text: 'Multi' },
+                            { x1: 50, y1: 680, x2: 100, y2: 695, text: 'Line' },
+                            { x1: 50, y1: 660, x2: 100, y2: 675, text: 'Text' }
+                        ]
+                    }
+                };
+                
+                let result = `📊 Annotation Format Comparison:\n\n`;
+                
+                // Simulate QuadPoints generation
+                for (const [type, data] of Object.entries(testData)) {
+                    const quadPoints = [];
+                    for (const quad of data.quads) {
+                        quadPoints.push(quad.x1, quad.y2, quad.x2, quad.y2, quad.x1, quad.y1, quad.x2, quad.y1);
+                    }
+                    
+                    result += `${type.toUpperCase()} ANNOTATION:\n`;
+                    result += `  Text: "${data.text}"\n`;
+                    result += `  Quads: ${data.quads.length}\n`;
+                    result += `  QuadPoints length: ${quadPoints.length}\n`;
+                    result += `  QuadPoints format: [${quadPoints.slice(0, 8).join(', ')}${quadPoints.length > 8 ? '...' : ''}]\n`;
+                    result += `  Valid QuadPoints: ${quadPoints.length % 8 === 0 && quadPoints.every(v => Number.isFinite(v))}\n\n`;
+                }
+                
+                result += `🔍 ANALYSIS:\n`;
+                result += `- Single-quad annotations: 8 QuadPoints values\n`;
+                result += `- Multi-quad annotations: 8 × N QuadPoints values\n`;
+                result += `- PDF spec requires: exactly 8 values per quad\n`;
+                result += `- Issue likely: multi-quad array handling in pdf-lib\n`;
+                result += `\n💡 SOLUTION: Split multi-quad into single-quad annotations`;
+                
+                showResult(result, 'info');
+                
+            } catch (error) {
+                showResult(`❌ Error during format comparison: ${error.message}\n\nStack trace:\n${error.stack}`, 'error');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

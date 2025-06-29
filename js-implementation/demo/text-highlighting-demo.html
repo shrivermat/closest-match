@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Line Text Highlighting Demo - JavaScript Implementation</title>
+    <title>Multi-Line Text Annotation Demo - JavaScript Implementation</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -131,8 +131,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎨 Multi-Line Text Highlighting Demo</h1>
-        <p><strong>JavaScript Implementation</strong> - Test the new multi-line text highlighting capabilities</p>
+        <h1>🎨 Multi-Line Text Annotation Demo</h1>
+        <p><strong>JavaScript Implementation</strong> - Test multi-line text annotations including highlights, strike-through, and underlines</p>
         
         <div class="section">
             <h3>📄 Sample Data</h3>
@@ -140,19 +140,21 @@
             
             <div class="input-group">
                 <label for="searchText">Search Text:</label>
-                <input type="text" id="searchText" value="CIRCUIT AND METHOD FOR OPERATING A CIRCUIT" 
+                <input type="text" id="searchText" value="(75) Inventors: Wolfram Kluge, Dresden (DE): Jeannette Zarbock, Dresden (DE); Tilo Ferchland, Dresden (DE)" 
                        placeholder="Text to search for in the document">
             </div>
             
             <div class="input-group">
-                <label for="formattedText">Formatted Text with Highlights:</label>
-                <textarea id="formattedText" rows="3" placeholder="HTML text with highlight markup">
-<strong>(54) </strong><strong style="background-color: rgb(254, 255, 1);">CIRCUIT AND METHOD</strong><strong> FOR </strong><strong style="background-color: rgb(109, 217, 255);">OPERATING A CIRCUIT</strong></textarea>
+                <label for="formattedText">Formatted Text with Annotations:</label>
+                <textarea id="formattedText" rows="4" placeholder="HTML text with annotation markup">
+<p>(75) Inventors: <s>Wolfram Kluge</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>): <u>Jeannette Zarbock</u>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>); <s>Tilo Ferchland</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>)<p></textarea>
             </div>
             
             <div class="example-text">
-                <strong>Example Pattern:</strong><br>
-                &lt;strong style="background-color: rgb(255, 255, 0);"&gt;TEXT TO HIGHLIGHT&lt;/strong&gt;
+                <strong>Supported Annotation Types:</strong><br>
+                • Highlights: &lt;span style="background-color: rgb(255, 255, 0);"&gt;TEXT&lt;/span&gt;<br>
+                • Strike-through: &lt;s&gt;TEXT&lt;/s&gt;<br>
+                • Underline: &lt;u&gt;TEXT&lt;/u&gt;
             </div>
         </div>
         
@@ -168,11 +170,11 @@
             </button>
             
             <button onclick="testTextHighlighting()" id="testHighlightBtn">
-                🎨 Test Complete Highlighting Pipeline
+                🎨 Test Complete Annotation Pipeline
             </button>
             
             <button onclick="generateSamplePDF()" id="testPDFBtn">
-                📄 Generate Sample PDF with Highlights
+                📄 Generate Sample PDF with Annotations
             </button>
         </div>
         

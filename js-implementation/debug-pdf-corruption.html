@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug PDF Corruption</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        pre { white-space: pre-wrap; font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug PDF Corruption - Annotation #6</h1>
+    <p>Testing the enhanced validation to identify and fix the malformed annotation causing PDF corruption.</p>
+    
+    <button onclick="debugAnnotationCreation()">🧪 Debug Annotation Creation</button>
+    <button onclick="generateTestPDF()">📄 Generate Test PDF with Enhanced Validation</button>
+    
+    <div id="results"></div>
+
+    <!-- Load PDF-lib -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <script type="module">
+        import { TextHighlighter } from './src/text-highlighter.js';
+        import { DocumentProcessor } from './src/document-processor.js';
+        
+        window.TextHighlighter = TextHighlighter;
+        window.DocumentProcessor = DocumentProcessor;
+        
+        console.log('✅ Debug modules loaded');
+    </script>
+    
+    <script>
+        function showResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<pre>${message}</pre>`;
+            results.appendChild(div);
+        }
+        
+        async function debugAnnotationCreation() {
+            try {
+                showResult('🔍 Starting annotation creation debug...', 'info');
+                
+                const highlighter = new TextHighlighter({ debugMode: true });
+                
+                // Use the exact test case that was failing
+                const formattedText = `<p>(75) Inventors: <s>Wolfram Kluge</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>): <u>Jeannette Zarbock</u>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>); <s>Tilo Ferchland</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>)<p>`;
+                
+                const annotations = highlighter.parseFormattedText(formattedText);
+                
+                let result = '📝 Parsed Annotations Debug:\n\n';
+                annotations.forEach((annotation, i) => {
+                    result += `Annotation #${i + 1}:\n`;
+                    result += `  Type: ${annotation.type}\n`;
+                    result += `  Text: "${annotation.text}"\n`;
+                    result += `  Color: r=${annotation.color.r}, g=${annotation.color.g}, b=${annotation.color.b}\n`;
+                    result += `  Hex: ${annotation.hexColor}\n\n`;
+                });
+                
+                // Check for potential issues
+                result += '🔍 Validation Check:\n';
+                for (let i = 0; i < annotations.length; i++) {
+                    const ann = annotations[i];
+                    const colorValid = [ann.color.r, ann.color.g, ann.color.b].every(val => 
+                        typeof val === 'number' && !isNaN(val) && isFinite(val) && val >= 0 && val <= 255
+                    );
+                    result += `Annotation #${i + 1}: Colors valid = ${colorValid}\n`;
+                    if (!colorValid) {
+                        result += `  ⚠️ ISSUE: Invalid color values: r=${ann.color.r}, g=${ann.color.g}, b=${ann.color.b}\n`;
+                    }
+                }
+                
+                showResult(result, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error during annotation debug: ${error.message}\n\nStack trace:\n${error.stack}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        async function generateTestPDF() {
+            try {
+                showResult('🔄 Loading test files and generating PDF with enhanced validation...', 'info');
+                
+                // Load the real PDF and hOCR files
+                const [pdfResponse, hocrResponse] = await Promise.all([
+                    fetch('./demo/document.pdf'),
+                    fetch('./demo/document.hocr')
+                ]);
+                
+                if (!pdfResponse.ok || !hocrResponse.ok) {
+                    throw new Error(`Failed to load files: PDF=${pdfResponse.status}, hOCR=${hocrResponse.status}`);
+                }
+                
+                const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+                const hocrContent = await hocrResponse.text();
+                
+                showResult('📄 Files loaded successfully. Processing with enhanced validation...', 'info');
+                
+                // Use DocumentProcessor with debug mode to catch validation errors
+                const processor = new DocumentProcessor({ debugMode: true });
+                
+                const searchText = "(75) Inventors: Wolfram Kluge, Dresden (DE): Jeannette Zarbock, Dresden (DE); Tilo Ferchland, Dresden (DE)";
+                const formattedText = `<p>(75) Inventors: <s>Wolfram Kluge</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>): <u>Jeannette Zarbock</u>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>); <s>Tilo Ferchland</s>, Dresden (<span style="background-color: rgb(254, 255, 1);">DE</span>)<p>`;
+                
+                const result = await processor.processDocumentWithHighlights(
+                    hocrContent,
+                    pdfBytes,
+                    searchText,
+                    formattedText,
+                    {
+                        pageNumber: 0,
+                        color: [1, 0, 0],
+                        opacity: 0.3,
+                        highlightOpacity: 0.4
+                    }
+                );
+                
+                if (result.success) {
+                    // Create download link
+                    const blob = new Blob([result.annotatedPdf], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    let resultText = '✅ PDF Generated Successfully with Enhanced Validation!\n\n';
+                    resultText += `📊 Processing Results:\n`;
+                    resultText += `   Search text: "${result.metadata.searchText}"\n`;
+                    resultText += `   Similarity: ${(result.metadata.similarity * 100).toFixed(1)}%\n`;
+                    resultText += `   Annotations created: ${result.metadata.highlightsCreated}\n\n`;
+                    
+                    if (result.highlightCoordinates) {
+                        resultText += `🎨 Annotation Details:\n`;
+                        result.highlightCoordinates.forEach((hc, i) => {
+                            resultText += `   #${i + 1}. ${hc.type.toUpperCase()}: "${hc.text}" (${hc.quads.length} quads, color: ${hc.hexColor})\n`;
+                        });
+                    }
+                    
+                    resultText += `\n📄 <a href="${url}" download="debug-annotations-fixed.pdf">Download Enhanced PDF</a>`;
+                    resultText += `\n\n🔒 Enhanced validation applied to prevent annotation #6 corruption issue.`;
+                    
+                    showResult(resultText, 'success');
+                } else {
+                    showResult(`❌ PDF generation failed: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                showResult(`❌ Error during PDF generation: ${error.message}\n\nStack trace:\n${error.stack}`, 'error');
+                console.error('PDF generation error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
